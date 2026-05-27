@@ -2,28 +2,52 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { nanoid } from "nanoid";
 
-/* ── Types ──────────────────────────────────────────────────────────────── */
+/* ── Constants ───────────────────────────────────────────────────────────── */
 
-type VideoFolder = {
+const VIDEO_EXTS = new Set([".mp4", ".mov", ".webm", ".avi", ".mkv", ".m4v", ".wmv"]);
+
+/* ── Types ───────────────────────────────────────────────────────────────── */
+
+type FolderEntry = {
   id: string;
-  path: string;
   label: string;
-  createdAt: string;
+  handle: FileSystemDirectoryHandle;
 };
 
 type VideoEntry = {
   name: string;
-  path: string;
+  handle: FileSystemFileHandle;
   size: number;
   sizeLabel: string;
-  mtime: string;
+  objectUrl: string;
 };
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
-function videoUrl(p: string) {
-  return `/api/videos/file?path=${encodeURIComponent(p)}`;
+function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+async function listVideos(dirHandle: FileSystemDirectoryHandle): Promise<VideoEntry[]> {
+  const entries: VideoEntry[] = [];
+  for await (const [name, handle] of dirHandle as unknown as AsyncIterable<[string, FileSystemHandle]>) {
+    if (handle.kind !== "file") continue;
+    const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
+    if (!VIDEO_EXTS.has(ext)) continue;
+    const file = await (handle as FileSystemFileHandle).getFile();
+    entries.push({
+      name,
+      handle: handle as FileSystemFileHandle,
+      size: file.size,
+      sizeLabel: formatSize(file.size),
+      objectUrl: URL.createObjectURL(file),
+    });
+  }
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /* ── Playback modal ──────────────────────────────────────────────────────── */
@@ -45,98 +69,8 @@ function VideoModal({ entry, onClose }: { entry: VideoEntry; onClose: () => void
           <p className="text-sm text-white font-medium truncate">{entry.name}</p>
           <button onClick={onClose} className="text-gray-400 hover:text-white ml-4 text-lg leading-none">✕</button>
         </div>
-        <video src={videoUrl(entry.path)} controls autoPlay className="w-full max-h-[72vh] bg-black" />
+        <video src={entry.objectUrl} controls autoPlay className="w-full max-h-[72vh] bg-black" />
         <div className="px-5 py-3 text-xs text-gray-500">{entry.sizeLabel} · {entry.name}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Add Folder modal ────────────────────────────────────────────────────── */
-
-function AddFolderModal({
-  onConfirm,
-  onCancel,
-}: {
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const [label, setLabel] = useState("");
-  const [folderPath, setFolderPath] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!folderPath.trim()) { setError("Folder path is required"); return; }
-    if (!label.trim()) { setError("Name is required"); return; }
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/video-folders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: folderPath.trim(), label: label.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed"); return; }
-      onConfirm();
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
-      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-white">Add Folder</h2>
-          <button onClick={onCancel} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
-          )}
-
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Name</label>
-            <input
-              autoFocus
-              required
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. My Videos"
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Folder path</label>
-            <input
-              required
-              value={folderPath}
-              onChange={(e) => setFolderPath(e.target.value)}
-              placeholder={String.raw`e.g. C:\Users\You\Videos`}
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors"
-            >Cancel</button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
-            >{submitting ? "Saving…" : "Add Folder"}</button>
-          </div>
-        </form>
       </div>
     </div>
   );
@@ -148,17 +82,18 @@ function VideoCard({
   entry,
   onWatch,
   onUpload,
-  onRefresh,
+  onDelete,
+  onRename,
 }: {
   entry: VideoEntry;
   onWatch: () => void;
   onUpload: () => void;
-  onRefresh: () => void;
+  onDelete: () => void;
+  onRename: (newName: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(entry.name);
-  const [busy, setBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -169,38 +104,16 @@ function VideoCard({
     return () => document.removeEventListener("mousedown", fn);
   }, [menuOpen]);
 
-  async function saveRename() {
+  function saveRename() {
     const newName = draft.trim();
-    if (!newName || newName === entry.name) { setRenaming(false); return; }
-    setBusy(true);
-    try {
-      const res = await fetch("/api/videos", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: entry.path, newName }),
-      });
-      if (!res.ok) { const d = await res.json(); alert("Rename failed: " + d.error); }
-      else onRefresh();
-    } catch (e) { alert("Rename failed: " + (e instanceof Error ? e.message : e)); }
-    setBusy(false);
+    if (newName && newName !== entry.name) onRename(newName);
     setRenaming(false);
   }
 
-  async function doDelete() {
-    setMenuOpen(false);
-    if (!confirm(`Permanently delete "${entry.name}"?`)) return;
-    setBusy(true);
-    try {
-      await fetch(`/api/videos?path=${encodeURIComponent(entry.path)}`, { method: "DELETE" });
-      onRefresh();
-    } catch (e) { alert("Delete failed: " + (e instanceof Error ? e.message : e)); }
-    setBusy(false);
-  }
-
   return (
-    <div className={`relative rounded-xl overflow-hidden break-inside-avoid mb-4 group bg-black/30 ${busy ? "opacity-40 pointer-events-none" : ""}`}>
+    <div className="relative rounded-xl overflow-hidden break-inside-avoid mb-4 group bg-black/30">
       <video
-        src={`${videoUrl(entry.path)}#t=0.5`}
+        src={`${entry.objectUrl}#t=0.5`}
         preload="metadata"
         muted
         playsInline
@@ -233,7 +146,7 @@ function VideoCard({
               className="w-full text-left px-4 py-2.5 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
             >Rename</button>
             <button
-              onClick={doDelete}
+              onClick={() => { setMenuOpen(false); onDelete(); }}
               className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition-colors"
             >Delete</button>
           </div>
@@ -278,54 +191,107 @@ function VideoCard({
 
 export default function VideosPage() {
   const router = useRouter();
-  const [folders, setFolders] = useState<VideoFolder[]>([]);
+  const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [watching, setWatching] = useState<VideoEntry | null>(null);
-  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null); // video name being uploaded
 
-  async function loadFolders(selectId?: string) {
-    const res = await fetch("/api/video-folders");
-    const data: VideoFolder[] = await res.json();
-    setFolders(data);
-    const target = selectId ?? activeFolderId ?? data[0]?.id ?? null;
-    setActiveFolderId(target);
-  }
+  // Revoke object URLs when videos change or component unmounts
+  useEffect(() => {
+    return () => {
+      videos.forEach((v) => URL.revokeObjectURL(v.objectUrl));
+    };
+  }, [videos]);
 
-  async function loadVideos(folderId: string) {
+  async function loadVideos(handle: FileSystemDirectoryHandle) {
     setLoading(true);
     setVideos([]);
     try {
-      const res = await fetch(`/api/videos?folderId=${folderId}`);
-      if (res.ok) setVideos(await res.json());
+      const entries = await listVideos(handle);
+      setVideos(entries);
+    } catch (e) {
+      alert("Could not read folder: " + (e instanceof Error ? e.message : e));
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { loadFolders(); }, []);
-
   useEffect(() => {
-    if (activeFolderId) loadVideos(activeFolderId);
+    if (!activeFolderId) return;
+    const folder = folders.find((f) => f.id === activeFolderId);
+    if (folder) loadVideos(folder.handle);
   }, [activeFolderId]);
 
-  async function handleFolderConfirmed() {
-    setShowAddFolder(false);
-    const res = await fetch("/api/video-folders");
-    const data: VideoFolder[] = await res.json();
-    setFolders(data);
-    setActiveFolderId(data[data.length - 1]?.id ?? null);
+  async function pickFolder() {
+    let dirHandle: FileSystemDirectoryHandle;
+    try {
+      dirHandle = await (window as any).showDirectoryPicker({ mode: "readwrite" });
+    } catch (e: any) {
+      if (e?.name !== "AbortError") alert("Could not access folder: " + (e?.message ?? e));
+      return;
+    }
+
+    const id = nanoid(6);
+    const folder: FolderEntry = { id, label: dirHandle.name, handle: dirHandle };
+    setFolders((prev) => [...prev, folder]);
+    setActiveFolderId(id);
+    loadVideos(dirHandle);
   }
 
-  async function removeFolder(id: string) {
-    if (!confirm("Remove this folder from the list?")) return;
-    await fetch(`/api/video-folders/${id}`, { method: "DELETE" });
+  function removeFolder(id: string) {
     const updated = folders.filter((f) => f.id !== id);
     setFolders(updated);
     if (activeFolderId === id) {
-      setActiveFolderId(updated[0]?.id ?? null);
+      videos.forEach((v) => URL.revokeObjectURL(v.objectUrl));
       setVideos([]);
+      setActiveFolderId(updated[0]?.id ?? null);
+    }
+  }
+
+  async function handleUpload(entry: VideoEntry) {
+    setUploading(entry.name);
+    try {
+      const file = await entry.handle.getFile();
+      const form = new FormData();
+      form.append("file", file, entry.name);
+      const res = await fetch("/api/videos/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
+      const { path } = await res.json();
+      router.push(`/post?videoPath=${encodeURIComponent(path)}`);
+    } catch (e) {
+      alert("Upload failed: " + (e instanceof Error ? e.message : e));
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function handleDelete(entry: VideoEntry, folderHandle: FileSystemDirectoryHandle) {
+    if (!confirm(`Permanently delete "${entry.name}"?`)) return;
+    try {
+      await folderHandle.removeEntry(entry.name);
+      URL.revokeObjectURL(entry.objectUrl);
+      setVideos((prev) => prev.filter((v) => v.name !== entry.name));
+    } catch (e) {
+      alert("Delete failed: " + (e instanceof Error ? e.message : e));
+    }
+  }
+
+  async function handleRename(entry: VideoEntry, newName: string, folderHandle: FileSystemDirectoryHandle) {
+    try {
+      // Read original file, write under new name, delete old
+      const file = await entry.handle.getFile();
+      const newHandle = await folderHandle.getFileHandle(newName, { create: true });
+      const writable = await newHandle.createWritable();
+      await writable.write(file);
+      await writable.close();
+      await folderHandle.removeEntry(entry.name);
+      URL.revokeObjectURL(entry.objectUrl);
+      // Reload to reflect the rename
+      await loadVideos(folderHandle);
+    } catch (e) {
+      alert("Rename failed: " + (e instanceof Error ? e.message : e));
     }
   }
 
@@ -334,12 +300,6 @@ export default function VideosPage() {
   return (
     <div className="flex flex-col min-h-full">
       {watching && <VideoModal entry={watching} onClose={() => setWatching(null)} />}
-      {showAddFolder && (
-        <AddFolderModal
-          onConfirm={handleFolderConfirmed}
-          onCancel={() => setShowAddFolder(false)}
-        />
-      )}
 
       {/* Folder tabs */}
       <div className="flex items-center gap-0.5 px-6 pt-5 border-b border-[var(--border)] overflow-x-auto shrink-0">
@@ -362,7 +322,7 @@ export default function VideosPage() {
           </div>
         ))}
         <button
-          onClick={() => setShowAddFolder(true)}
+          onClick={pickFolder}
           className="shrink-0 px-3.5 py-2 text-sm text-indigo-400 hover:text-indigo-300 hover:bg-indigo-600/10 rounded-t-lg transition-colors"
         >
           + Add Folder
@@ -382,17 +342,17 @@ export default function VideosPage() {
             <p className="text-white font-medium">No folders added yet</p>
             <p className="text-sm text-gray-500 mt-1">Add a folder to browse and upload your videos.</p>
             <button
-              onClick={() => setShowAddFolder(true)}
+              onClick={pickFolder}
               className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
             >+ Add Folder</button>
           </div>
         )}
 
-        {activeFolder && (
-          <p className="text-xs text-gray-600 font-mono truncate">{activeFolder.path}</p>
-        )}
-
         {loading && <p className="text-gray-500 text-sm">Scanning folder…</p>}
+
+        {uploading && (
+          <p className="text-indigo-400 text-sm">Preparing "{uploading}" for upload…</p>
+        )}
 
         {!loading && activeFolder && (
           videos.length === 0 ? (
@@ -405,11 +365,12 @@ export default function VideosPage() {
               <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4">
                 {videos.map((v) => (
                   <VideoCard
-                    key={v.path}
+                    key={v.name}
                     entry={v}
                     onWatch={() => setWatching(v)}
-                    onUpload={() => router.push(`/post?videoPath=${encodeURIComponent(v.path)}`)}
-                    onRefresh={() => activeFolderId && loadVideos(activeFolderId)}
+                    onUpload={() => handleUpload(v)}
+                    onDelete={() => handleDelete(v, activeFolder.handle)}
+                    onRename={(newName) => handleRename(v, newName, activeFolder.handle)}
                   />
                 ))}
               </div>
