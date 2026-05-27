@@ -11,12 +11,9 @@ export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams;
   const code = search.get("code");
   const rawState = search.get("state") ?? "";
-  // State may be encoded as base64(providerId).base64(verifier) (TikTok PKCE flow)
-  // or plain providerId (other adapters).
+  // State is either "providerId.verifier" (TikTok PKCE) or just "providerId" (other providers).
   const dot = rawState.indexOf(".");
-  const decodedProviderId = dot !== -1
-    ? Buffer.from(rawState.slice(0, dot), "base64url").toString()
-    : rawState;
+  const decodedProviderId = dot !== -1 ? rawState.slice(0, dot) : rawState;
   const providerId = search.get("provider_id") || decodedProviderId;
 
   if (!code || !providerId) {

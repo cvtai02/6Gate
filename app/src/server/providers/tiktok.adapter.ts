@@ -18,30 +18,22 @@ const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 export const TIKTOK_DEFAULT_SCOPES = "user.info.basic,user.info.profile,video.upload,video.publish";
 
 function generateCodeVerifier(): string {
-  return randomBytes(32).toString("base64url");
+  return randomBytes(64).toString("base64url");
 }
 
 function generateCodeChallenge(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
 }
 
-// Encode providerId + verifier into state so it survives server restarts/hot-reloads.
-// Format: base64url(providerId) + "." + base64url(verifier)
+// State format: providerId + "." + verifier — both are base64url/alphanumeric, no dots in either.
 function encodeState(providerId: string, verifier: string): string {
-  return Buffer.from(providerId).toString("base64url") + "." + Buffer.from(verifier).toString("base64url");
+  return `${providerId}.${verifier}`;
 }
 
-function decodeState(state: string): { providerId: string; verifier: string } | null {
+function decodeVerifier(state: string): string | null {
   const dot = state.indexOf(".");
   if (dot === -1) return null;
-  try {
-    return {
-      providerId: Buffer.from(state.slice(0, dot), "base64url").toString(),
-      verifier: Buffer.from(state.slice(dot + 1), "base64url").toString(),
-    };
-  } catch {
-    return null;
-  }
+  return state.slice(dot + 1) || null;
 }
 
 const PRIVACY_MAP: Record<string, string> = {
@@ -81,8 +73,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
   }): Promise<void> {
     const provider = await getProviderRecord(input.providerId);
 
-    const decoded = input.state ? decodeState(input.state) : null;
-    const codeVerifier = decoded?.verifier ?? null;
+    const codeVerifier = input.state ? decodeVerifier(input.state) : null;
     if (!codeVerifier) throw new Error("PKCE state missing or invalid — please restart the OAuth flow");
 
     const tokenBody: Record<string, string> = {
@@ -102,9 +93,13 @@ export class TikTokAdapter implements SocialProviderAdapter {
     const tokens = await tokenRes.json().catch(() => ({}));
     const data = tokens.data ?? tokens;
 
-    if (!tokenRes.ok || (tokens.error?.code && tokens.error.code !== "ok")) {
-      const msg = tokens.error?.message ?? `HTTP ${tokenRes.status}`;
-      const code = tokens.error?.code ?? String(tokenRes.status);
+    if (!tokenRes.ok || tokens.error) {
+      // TikTok has two error shapes:
+      // OAuth layer: { "error": "invalid_request", "error_description": "..." }
+      // API layer:   { "error": { "code": "...", "message": "..." } }
+      const isOAuthError = typeof tokens.error === "string";
+      const msg = isOAuthError ? (tokens.error_description ?? tokens.error) : (tokens.error?.message ?? `HTTP ${tokenRes.status}`);
+      const code = isOAuthError ? tokens.error : (tokens.error?.code ?? String(tokenRes.status));
       throw new Error(`TikTok token exchange [${code}]: ${msg}`);
     }
     if (!data.access_token) {
