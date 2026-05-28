@@ -68,9 +68,6 @@ export default async function DashboardPage() {
         {stats.recent.length === 0 ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-10 text-center">
             <p className="text-gray-500 text-sm">No jobs yet.</p>
-            <Link href="/post" className="inline-block mt-3 text-sm text-indigo-400 hover:text-indigo-300">
-              Create your first post →
-            </Link>
           </div>
         ) : (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">

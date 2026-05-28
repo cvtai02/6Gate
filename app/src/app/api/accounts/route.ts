@@ -4,9 +4,13 @@ import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const typeFilter = searchParams.get("type");
+  const providerIdFilter = searchParams.get("providerId");
+
   const db = getDb();
-  const rows = await db
+  const query = db
     .select({
       id: accounts.id,
       providerId: accounts.providerId,
@@ -23,7 +27,12 @@ export async function GET() {
     })
     .from(accounts)
     .leftJoin(providers, eq(accounts.providerId, providers.id))
-    .orderBy(desc(accounts.createdAt))
-    .all();
+    .orderBy(desc(accounts.createdAt));
+
+  let rows = await query.all();
+
+  if (typeFilter) rows = rows.filter((r) => r.providerType === typeFilter);
+  if (providerIdFilter) rows = rows.filter((r) => r.providerId === providerIdFilter);
+
   return Response.json(rows);
 }

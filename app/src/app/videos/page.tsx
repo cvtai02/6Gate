@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { nanoid } from "nanoid";
 
 /* ── Constants ───────────────────────────────────────────────────────────── */
@@ -81,13 +80,11 @@ function VideoModal({ entry, onClose }: { entry: VideoEntry; onClose: () => void
 function VideoCard({
   entry,
   onWatch,
-  onUpload,
   onDelete,
   onRename,
 }: {
   entry: VideoEntry;
   onWatch: () => void;
-  onUpload: () => void;
   onDelete: () => void;
   onRename: (newName: string) => void;
 }) {
@@ -173,13 +170,7 @@ function VideoCard({
         ) : (
           <>
             <p className="text-xs font-medium text-white truncate leading-snug mb-1.5">{entry.name}</p>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-gray-400">{entry.sizeLabel}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onUpload(); }}
-                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded-lg transition-colors shrink-0"
-              >Upload</button>
-            </div>
+            <span className="text-xs text-gray-400">{entry.sizeLabel}</span>
           </>
         )}
       </div>
@@ -190,13 +181,11 @@ function VideoCard({
 /* ── Page ────────────────────────────────────────────────────────────────── */
 
 export default function VideosPage() {
-  const router = useRouter();
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [watching, setWatching] = useState<VideoEntry | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null); // video name being uploaded
 
   // Revoke object URLs when videos change or component unmounts
   useEffect(() => {
@@ -247,23 +236,6 @@ export default function VideosPage() {
       videos.forEach((v) => URL.revokeObjectURL(v.objectUrl));
       setVideos([]);
       setActiveFolderId(updated[0]?.id ?? null);
-    }
-  }
-
-  async function handleUpload(entry: VideoEntry) {
-    setUploading(entry.name);
-    try {
-      const file = await entry.handle.getFile();
-      const form = new FormData();
-      form.append("file", file, entry.name);
-      const res = await fetch("/api/videos/upload", { method: "POST", body: form });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Upload failed");
-      const { path } = await res.json();
-      router.push(`/post?videoPath=${encodeURIComponent(path)}`);
-    } catch (e) {
-      alert("Upload failed: " + (e instanceof Error ? e.message : e));
-    } finally {
-      setUploading(null);
     }
   }
 
@@ -350,10 +322,6 @@ export default function VideosPage() {
 
         {loading && <p className="text-gray-500 text-sm">Scanning folder…</p>}
 
-        {uploading && (
-          <p className="text-indigo-400 text-sm">Preparing "{uploading}" for upload…</p>
-        )}
-
         {!loading && activeFolder && (
           videos.length === 0 ? (
             <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-10 text-center">
@@ -368,7 +336,6 @@ export default function VideosPage() {
                     key={v.name}
                     entry={v}
                     onWatch={() => setWatching(v)}
-                    onUpload={() => handleUpload(v)}
                     onDelete={() => handleDelete(v, activeFolder.handle)}
                     onRename={(newName) => handleRename(v, newName, activeFolder.handle)}
                   />

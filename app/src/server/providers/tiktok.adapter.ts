@@ -1,9 +1,10 @@
-import { nanoid } from "nanoid";
+﻿import { nanoid } from "nanoid";
 import { randomBytes, createHash } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts } from "@/server/db/schema";
+import { accounts, providers as providersTable } from "@/server/db/schema";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
+import CryptoJS from "crypto-js";
 import {
   REDIRECT_URI,
   getProviderRecord,
@@ -12,28 +13,28 @@ import {
   checkHttpOk,
   createDestinationForAccount,
 } from "./adapter-utils";
+import { ProviderType } from "@/lib/enums";
 
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
 export const TIKTOK_DEFAULT_SCOPES = "user.info.basic,user.info.profile,video.upload,video.publish";
 
 function generateCodeVerifier(): string {
-  return randomBytes(64).toString("base64url");
+  return generateRandomString(43);
+}
+
+function generateRandomString(length: number): string {
+  var result = '';
+  var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  var charactersLength = characters.length;
+  for (var i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
 }
 
 function generateCodeChallenge(verifier: string): string {
-  return createHash("sha256").update(verifier).digest("base64url");
-}
-
-// State format: providerId + "." + verifier — both are base64url/alphanumeric, no dots in either.
-function encodeState(providerId: string, verifier: string): string {
-  return `${providerId}.${verifier}`;
-}
-
-function decodeVerifier(state: string): string | null {
-  const dot = state.indexOf(".");
-  if (dot === -1) return null;
-  return state.slice(dot + 1) || null;
+  return CryptoJS.SHA256(verifier).toString(CryptoJS.enc.Hex);
 }
 
 const PRIVACY_MAP: Record<string, string> = {
@@ -43,7 +44,7 @@ const PRIVACY_MAP: Record<string, string> = {
 };
 
 export class TikTokAdapter implements SocialProviderAdapter {
-  id = "tiktok";
+  id = ProviderType.tiktok;
   name = "TikTok";
 
   async getAuthUrl(providerId: string): Promise<string> {
@@ -53,12 +54,19 @@ export class TikTokAdapter implements SocialProviderAdapter {
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
+    // Store verifier in DB â€" avoids any state-encoding / URL-transmission issues
+    const db = getDb();
+    await db.update(providersTable)
+      .set({ pkceVerifier: codeVerifier })
+      .where(eq(providersTable.id, providerId));
+    console.log("[TikTok PKCE debug] stored verifier len:", codeVerifier.length, "challenge:", codeChallenge, "providerId:", providerId);
+
     const params = new URLSearchParams({
       client_key: provider.clientId!,
       redirect_uri: REDIRECT_URI,
       response_type: "code",
       scope: scopes,
-      state: encodeState(providerId, codeVerifier),
+      state: providerId,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     });
@@ -73,8 +81,18 @@ export class TikTokAdapter implements SocialProviderAdapter {
   }): Promise<void> {
     const provider = await getProviderRecord(input.providerId);
 
-    const codeVerifier = input.state ? decodeVerifier(input.state) : null;
-    if (!codeVerifier) throw new Error("PKCE state missing or invalid — please restart the OAuth flow");
+    // Read verifier from DB (stored during getAuthUrl), then clear it
+    const db = getDb();
+    const providerRow = await db.select({ pkceVerifier: providersTable.pkceVerifier })
+      .from(providersTable)
+      .where(eq(providersTable.id, input.providerId))
+      .get();
+    const codeVerifier = providerRow?.pkceVerifier ?? null;
+    console.log("[TikTok PKCE debug] providerId:", input.providerId, "verifier len:", codeVerifier?.length, "first20:", codeVerifier?.slice(0, 20));
+    if (!codeVerifier) throw new Error("PKCE verifier not found, please restart the OAuth flow");
+    await db.update(providersTable)
+      .set({ pkceVerifier: null })
+      .where(eq(providersTable.id, input.providerId));
 
     const tokenBody: Record<string, string> = {
       client_key: provider.clientId!,
@@ -113,7 +131,6 @@ export class TikTokAdapter implements SocialProviderAdapter {
     const userData = await userRes.json();
     const user = userData.data?.user ?? {};
 
-    const db = getDb();
     const now = new Date().toISOString();
     const accountId = `acc_tt_${nanoid(8)}`;
     const displayName = user.display_name ?? "TikTok User";
@@ -134,7 +151,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
       createdAt: now,
       updatedAt: now,
     });
-    await createDestinationForAccount(accountId, "tiktok", displayName, externalId);
+    await createDestinationForAccount(accountId, ProviderType.tiktok, displayName, externalId);
   }
 
   async refreshToken(accountId: string): Promise<void> {
@@ -157,7 +174,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
     const json = await res.json().catch(() => ({}));
     const data = json.data ?? json;
 
-    // TikTok returns errors with HTTP 200 — must check the body
+    // TikTok returns errors with HTTP 200 â€" must check the body
     if (!res.ok || (json.error?.code && json.error.code !== "ok")) {
       const msg = json.error?.message ?? `HTTP ${res.status}`;
       const code = json.error?.code ?? String(res.status);
@@ -266,7 +283,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
 
   async #ensureFreshToken(accountId: string) {
     const account = await getAccountRecord(accountId);
-    if (!account.refreshToken) return; // no refresh token — let upload attempt and fail with clear error if expired
+    if (!account.refreshToken) return; // no refresh token â€" let upload attempt and fail with clear error if expired
     if (
       account.expiresAt &&
       new Date(account.expiresAt) < new Date(Date.now() + 10 * 60 * 1000)

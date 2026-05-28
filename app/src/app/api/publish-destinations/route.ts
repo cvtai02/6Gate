@@ -5,25 +5,36 @@ import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const typeFilter = searchParams.get("type");
+  const providerIdFilter = searchParams.get("providerId");
+
   const db = getDb();
-  const rows = await db
+  let rows = await db
     .select({
       id: publishDestinations.id,
       socialAccountId: publishDestinations.socialAccountId,
       name: publishDestinations.name,
       type: publishDestinations.type,
       externalId: publishDestinations.externalId,
+      avatarUrl: publishDestinations.avatarUrl,
       createdAt: publishDestinations.createdAt,
       providerType: providers.type,
       providerName: providers.name,
+      accountProviderId: accounts.providerId,
       accountUsername: accounts.username,
+      accountAvatarUrl: accounts.avatarUrl,
     })
     .from(publishDestinations)
     .leftJoin(accounts, eq(publishDestinations.socialAccountId, accounts.id))
     .leftJoin(providers, eq(accounts.providerId, providers.id))
     .orderBy(desc(publishDestinations.createdAt))
     .all();
+
+  if (typeFilter) rows = rows.filter((r) => r.providerType === typeFilter);
+  if (providerIdFilter) rows = rows.filter((r) => r.accountProviderId === providerIdFilter);
+
   return Response.json(rows);
 }
 

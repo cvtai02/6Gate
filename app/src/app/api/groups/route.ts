@@ -15,12 +15,13 @@ export async function GET() {
       groupId: groupDestinations.groupId,
       destinationId: publishDestinations.id,
       name: publishDestinations.name,
-      accountDisplayName: accounts.displayName,
       type: publishDestinations.type,
       externalId: publishDestinations.externalId,
       socialAccountId: publishDestinations.socialAccountId,
+      avatarUrl: publishDestinations.avatarUrl,
       providerType: providers.type,
       providerName: providers.name,
+      accountAvatarUrl: accounts.avatarUrl,
     })
     .from(groupDestinations)
     .leftJoin(publishDestinations, eq(groupDestinations.destinationId, publishDestinations.id))
@@ -37,10 +38,7 @@ export async function GET() {
   return Response.json(
     allGroups.map((g) => ({
       ...g,
-      destinations: (destsByGroup.get(g.id) ?? []).map(({ accountDisplayName, name, ...rest }) => ({
-        ...rest,
-        name: accountDisplayName ?? name,
-      })),
+      destinations: destsByGroup.get(g.id) ?? [],
     }))
   );
 }

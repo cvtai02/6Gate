@@ -3,12 +3,13 @@ import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
 import { providers, accounts, publishDestinations } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { ProviderType, DestinationType } from "@/lib/enums";
 
-const DESTINATION_TYPE: Record<string, string> = {
-  youtube: "youtube_channel",
-  facebook: "facebook_page",
-  tiktok: "tiktok_account",
-  instagram: "instagram_account",
+const DESTINATION_TYPE: Record<string, DestinationType> = {
+  [ProviderType.youtube]: DestinationType.youtube_channel,
+  [ProviderType.meta]: DestinationType.facebook_page,
+  [ProviderType.tiktok]: DestinationType.tiktok_account,
+  instagram: DestinationType.instagram_account,
 };
 
 export async function createDestinationForAccount(

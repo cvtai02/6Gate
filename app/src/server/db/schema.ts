@@ -9,6 +9,7 @@ export const providers = sqliteTable("providers", {
   authUrl: text("auth_url"),
   tokenUrl: text("token_url"),
   scopes: text("scopes"),
+  pkceVerifier: text("pkce_verifier"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -30,6 +31,7 @@ export const accounts = sqliteTable("accounts", {
 export const postJobs = sqliteTable("post_jobs", {
   id: text("id").primaryKey(),
   accountId: text("account_id").notNull(),
+  destinationId: text("destination_id"),
   platform: text("platform").notNull(),
   status: text("status").notNull(),
   videoPath: text("video_path").notNull(),
@@ -76,8 +78,12 @@ export const publishDestinations = sqliteTable("publish_destinations", {
   id: text("id").primaryKey(),
   socialAccountId: text("social_account_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // youtube_channel | facebook_page | tiktok_account | instagram_account
+  type: text("type").notNull(), // youtube_channel | facebook_page | tiktok_account
   externalId: text("external_id"),
+  /** Page-level access token (Meta only). Stored here so one user account can hold many pages. */
+  accessToken: text("access_token"),
+  /** Page/channel/account avatar URL for this destination. */
+  avatarUrl: text("avatar_url"),
   createdAt: text("created_at").notNull(),
 });
 

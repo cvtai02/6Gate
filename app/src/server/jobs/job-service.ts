@@ -6,6 +6,7 @@ import { z } from "zod";
 
 export const CreateJobSchema = z.object({
   accountId: z.string(),
+  destinationId: z.string().optional(),
   videoPath: z.string(),
   title: z.string().optional(),
   caption: z.string().optional(),
@@ -40,6 +41,7 @@ export async function createJob(input: CreateJobInput) {
   await db.insert(postJobs).values({
     id,
     accountId: input.accountId,
+    destinationId: input.destinationId ?? null,
     platform: provider.type,
     status: "queued",
     videoPath: input.videoPath,

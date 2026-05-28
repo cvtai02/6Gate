@@ -18,9 +18,16 @@ export function RetryButton({ jobId }: { jobId: string }) {
     <button
       onClick={handleRetry}
       disabled={loading}
-      className="w-full bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 border border-yellow-500/30 px-5 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+      className="w-full flex items-center justify-center gap-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 px-5 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
     >
-      {loading ? "Retrying..." : "Retry Job"}
+      {loading ? (
+        <>
+          <span className="w-3.5 h-3.5 rounded-full border-2 border-indigo-400/30 border-t-indigo-400 animate-spin" />
+          Retrying…
+        </>
+      ) : (
+        "↺  Retry Job"
+      )}
     </button>
   );
 }

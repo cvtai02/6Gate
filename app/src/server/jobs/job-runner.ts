@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getAdapter } from "@/server/providers/registry";
 import { appendLog, emitStatus } from "./log-service";
 import { updateJobStatus } from "./job-service";
+import fs from "fs";
 
 let running = false;
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -50,6 +51,7 @@ async function processNextJob() {
 
     const result = await adapter.publishVideo({
       accountId: job.accountId,
+      destinationId: job.destinationId ?? undefined,
       videoPath: job.videoPath,
       title: job.title ?? undefined,
       caption: job.caption ?? undefined,
@@ -75,8 +77,30 @@ async function processNextJob() {
   }
 }
 
+async function resetOrphanedJobs() {
+  const db = getDb();
+  const orphans = await db
+    .select()
+    .from(postJobs)
+    .where(eq(postJobs.status, "running"))
+    .all();
+
+  for (const job of orphans) {
+    // If the temp video file is gone, mark failed — nothing to retry.
+    if (!fs.existsSync(job.videoPath)) {
+      await appendLog(job.id, "error", "Job interrupted by server restart; video file no longer exists");
+      await updateJobStatus(job.id, "failed", { errorMessage: "Interrupted by server restart — video file is gone" });
+      emitStatus(job.id, "failed");
+    } else {
+      await appendLog(job.id, "info", "Job re-queued after server restart");
+      await updateJobStatus(job.id, "queued");
+    }
+  }
+}
+
 export function startJobRunner() {
   if (intervalId) return;
+  resetOrphanedJobs();
   intervalId = setInterval(processNextJob, 2000);
   processNextJob();
 }

@@ -14,6 +14,24 @@ export function runMigrations(db: any) {
     )
   `);
 
+  // Add pkce_verifier column if not already present (idempotent)
+  try { db.run(`ALTER TABLE providers ADD COLUMN pkce_verifier TEXT`); } catch {}
+
+  // Add destination_id to post_jobs for per-destination routing (idempotent)
+  try { db.run(`ALTER TABLE post_jobs ADD COLUMN destination_id TEXT`); } catch {}
+
+  // Add access_token to publish_destinations for page-level tokens (Meta) (idempotent)
+  try { db.run(`ALTER TABLE publish_destinations ADD COLUMN access_token TEXT`); } catch {}
+
+  // Add avatar_url to publish_destinations for page/channel avatars (idempotent)
+  try { db.run(`ALTER TABLE publish_destinations ADD COLUMN avatar_url TEXT`); } catch {}
+
+  // Rename legacy "Facebook" provider names to "Meta" (idempotent)
+  db.run(`UPDATE providers SET name = 'Meta' WHERE type = 'facebook' AND name != 'Meta'`);
+
+  // Rename provider type 'facebook' → 'meta' (idempotent)
+  db.run(`UPDATE providers SET type = 'meta' WHERE type = 'facebook'`);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
@@ -36,6 +54,7 @@ export function runMigrations(db: any) {
     CREATE TABLE IF NOT EXISTS post_jobs (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL,
+      destination_id TEXT,
       platform TEXT NOT NULL,
       status TEXT NOT NULL,
       video_path TEXT NOT NULL,
@@ -99,6 +118,8 @@ export function runMigrations(db: any) {
       name TEXT NOT NULL,
       type TEXT NOT NULL,
       external_id TEXT,
+      access_token TEXT,
+      avatar_url TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (social_account_id) REFERENCES accounts(id)
     )

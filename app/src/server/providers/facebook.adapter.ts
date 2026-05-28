@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { accounts } from "@/server/db/schema";
+import { accounts, publishDestinations } from "@/server/db/schema";
+import { eq, and } from "drizzle-orm";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
 import {
   REDIRECT_URI,
@@ -8,8 +9,9 @@ import {
   getAccountRecord,
   readVideoFile,
   checkHttpOk,
-  createDestinationForAccount,
 } from "./adapter-utils";
+import { ProviderType, DestinationType } from "@/lib/enums";
+import { syncInstagramForPage, syncThreadsForUser } from "./meta-ig-threads";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";
@@ -22,8 +24,21 @@ const PRIVACY_MAP: Record<string, string> = {
   unlisted: "ALL_FRIENDS",
 };
 
+type FbPage = {
+  id: string;
+  name: string;
+  access_token: string;
+  picture?: { data?: { url?: string } };
+};
+
+type FbMe = {
+  id: string;
+  name: string;
+  picture?: { data?: { url?: string } };
+};
+
 export class FacebookAdapter implements SocialProviderAdapter {
-  id = "facebook";
+  id = ProviderType.meta;
   name = "Facebook";
 
   async getAuthUrl(providerId: string): Promise<string> {
@@ -74,12 +89,19 @@ export class FacebookAdapter implements SocialProviderAdapter {
     await checkHttpOk(longRes, "Facebook long-lived token exchange");
     const { access_token: longToken } = await longRes.json();
 
-    // Get pages managed by this user
+    // Get the Facebook user's identity
+    const meRes = await fetch(
+      `${GRAPH}/me?fields=id,name,picture.type(large)&access_token=${longToken}`
+    );
+    await checkHttpOk(meRes, "Facebook get user identity");
+    const me = await meRes.json() as FbMe;
+
+    // Get pages managed by this user (include page picture + page token)
     const pagesRes = await fetch(
-      `${GRAPH}/me/accounts?access_token=${longToken}`
+      `${GRAPH}/me/accounts?fields=id,name,access_token,picture.type(large)&access_token=${longToken}`
     );
     await checkHttpOk(pagesRes, "Facebook get pages");
-    const { data: pages } = await pagesRes.json();
+    const { data: pages } = await pagesRes.json() as { data: FbPage[] };
 
     if (!pages || pages.length === 0) {
       throw new Error(
@@ -90,36 +112,111 @@ export class FacebookAdapter implements SocialProviderAdapter {
     const db = getDb();
     const now = new Date().toISOString();
 
-    for (const page of pages) {
-      const accountId = `acc_fb_${nanoid(8)}`;
+    // Upsert one account for the Facebook user (keyed by Facebook user ID)
+    const existingAccount = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.providerId, input.providerId), eq(accounts.providerAccountId, me.id)))
+      .get();
+
+    let accountId: string;
+    if (existingAccount) {
+      await db.update(accounts).set({
+        displayName: me.name,
+        avatarUrl: me.picture?.data?.url ?? existingAccount.avatarUrl,
+        accessToken: longToken,
+        refreshToken: longToken,
+        updatedAt: now,
+      }).where(eq(accounts.id, existingAccount.id));
+      accountId = existingAccount.id;
+    } else {
+      accountId = `acc_fb_${nanoid(8)}`;
       await db.insert(accounts).values({
         id: accountId,
         providerId: input.providerId,
-        providerAccountId: page.id,
-        displayName: page.name,
+        providerAccountId: me.id,
+        displayName: me.name,
         username: null,
-        avatarUrl: null,
-        accessToken: page.access_token,
+        avatarUrl: me.picture?.data?.url ?? null,
+        accessToken: longToken,
         refreshToken: longToken,
         expiresAt: null,
-        scopes: page.perms?.join(",") ?? null,
+        scopes: null,
         createdAt: now,
         updatedAt: now,
       });
-      await createDestinationForAccount(accountId, "facebook", page.name, page.id);
     }
+
+    // Upsert one destination per page under this user account
+    for (const page of pages) {
+      const existingDest = await db
+        .select({ id: publishDestinations.id })
+        .from(publishDestinations)
+        .where(and(
+          eq(publishDestinations.socialAccountId, accountId),
+          eq(publishDestinations.externalId, page.id)
+        ))
+        .get();
+
+      const pageAvatarUrl = page.picture?.data?.url ?? null;
+      if (existingDest) {
+        await db.update(publishDestinations).set({
+          name: page.name,
+          accessToken: page.access_token,
+          avatarUrl: pageAvatarUrl,
+        }).where(eq(publishDestinations.id, existingDest.id));
+      } else {
+        await db.insert(publishDestinations).values({
+          id: `dest_${nanoid(8)}`,
+          socialAccountId: accountId,
+          name: page.name,
+          type: DestinationType.facebook_page,
+          externalId: page.id,
+          accessToken: page.access_token,
+          avatarUrl: pageAvatarUrl,
+          createdAt: now,
+        });
+      }
+
+      // Sync Instagram Business account connected to this page
+      await syncInstagramForPage(accountId, page.id, page.access_token, now);
+    }
+
+    // Sync Threads profile (best-effort; silently skipped if threads_basic not granted)
+    await syncThreadsForUser(accountId, longToken, now);
   }
 
   // Page access tokens don't expire, so refresh is a no-op.
-  // Calling this will extend the user token if stored.
-  async refreshToken(accountId: string): Promise<void> {
+  async refreshToken(_accountId: string): Promise<void> {
     // Page tokens are permanent; nothing to refresh.
   }
 
   async publishVideo(input: PublishVideoInput): Promise<PublishVideoResult> {
-    const account = await getAccountRecord(input.accountId);
-    const pageId = account.providerAccountId!;
-    const pageToken = account.accessToken!;
+    const db = getDb();
+    let pageId: string;
+    let pageToken: string;
+
+    if (input.destinationId) {
+      // Preferred path: get page ID and token from the destination record
+      const dest = await db
+        .select()
+        .from(publishDestinations)
+        .where(eq(publishDestinations.id, input.destinationId))
+        .get();
+      if (!dest) throw new Error(`Destination ${input.destinationId} not found`);
+      if (!dest.externalId) throw new Error(`Destination ${input.destinationId} has no page ID`);
+      if (!dest.accessToken) throw new Error(`Destination ${input.destinationId} has no page token — run Sync to refresh`);
+      pageId = dest.externalId;
+      pageToken = dest.accessToken;
+    } else {
+      // Legacy fallback: account IS the page (old one-account-per-page model)
+      const account = await getAccountRecord(input.accountId);
+      if (!account.providerAccountId) throw new Error("Account has no page ID");
+      if (!account.accessToken) throw new Error("Account has no page token");
+      pageId = account.providerAccountId;
+      pageToken = account.accessToken;
+    }
+
     const { buffer, mime } = readVideoFile(input.videoPath);
 
     const formData = new FormData();

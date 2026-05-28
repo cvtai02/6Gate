@@ -1,5 +1,7 @@
 export type PublishVideoInput = {
   accountId: string;
+  /** The publish_destination id — needed by Meta to look up the page token. */
+  destinationId?: string;
   videoPath: string;
   title?: string;
   caption?: string;

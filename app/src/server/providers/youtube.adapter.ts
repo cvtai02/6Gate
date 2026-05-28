@@ -11,6 +11,7 @@ import {
   checkHttpOk,
   createDestinationForAccount,
 } from "./adapter-utils";
+import { ProviderType } from "@/lib/enums";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -18,7 +19,7 @@ export const YOUTUBE_DEFAULT_SCOPES =
   "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly";
 
 export class YouTubeAdapter implements SocialProviderAdapter {
-  id = "youtube";
+  id = ProviderType.youtube;
   name = "YouTube";
 
   async getAuthUrl(providerId: string): Promise<string> {
@@ -116,7 +117,7 @@ export class YouTubeAdapter implements SocialProviderAdapter {
       updatedAt: now,
     });
 
-    await createDestinationForAccount(accountId, "youtube", displayName, externalId);
+    await createDestinationForAccount(accountId, ProviderType.youtube, displayName, externalId);
   }
 
   async refreshToken(accountId: string): Promise<void> {

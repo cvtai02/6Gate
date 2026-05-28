@@ -51,6 +51,7 @@ export async function uploadVideoToDestination(
 
   const publishInput: PublishVideoInput = {
     accountId: account.id,
+    destinationId,
     videoPath: input.videoPath,
     title: input.title,
     caption: input.caption,
