@@ -32,6 +32,9 @@ export function runMigrations(db: any) {
   // Rename provider type 'facebook' → 'meta' (idempotent)
   db.run(`UPDATE providers SET type = 'meta' WHERE type = 'facebook'`);
 
+  // Fix TikTok scopes to the correct set required by TikTok's current API (idempotent)
+  db.run(`UPDATE providers SET scopes = 'user.info.basic,video.upload,video.publish' WHERE type = 'tiktok'`);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,

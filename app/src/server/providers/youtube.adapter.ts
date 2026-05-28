@@ -117,7 +117,7 @@ export class YouTubeAdapter implements SocialProviderAdapter {
       updatedAt: now,
     });
 
-    await createDestinationForAccount(accountId, ProviderType.youtube, displayName, externalId);
+    await createDestinationForAccount(accountId, ProviderType.youtube, displayName, externalId, avatarUrl);
   }
 
   async refreshToken(accountId: string): Promise<void> {
@@ -128,6 +128,7 @@ export class YouTubeAdapter implements SocialProviderAdapter {
 
     const res = await fetch(TOKEN_URL, {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         refresh_token: account.refreshToken,
@@ -162,6 +163,7 @@ export class YouTubeAdapter implements SocialProviderAdapter {
       "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
       {
         method: "POST",
+        signal: AbortSignal.timeout(60_000),
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
@@ -173,7 +175,10 @@ export class YouTubeAdapter implements SocialProviderAdapter {
             title: input.title ?? "Untitled",
             description: input.caption ?? "",
           },
-          status: { privacyStatus: input.privacy ?? "private" },
+          status: {
+            privacyStatus: input.privacy ?? "private",
+            selfDeclaredMadeForKids: false,
+          },
         }),
       }
     );
@@ -182,12 +187,10 @@ export class YouTubeAdapter implements SocialProviderAdapter {
     const uploadUrl = initRes.headers.get("location");
     if (!uploadUrl) throw new Error("YouTube did not return an upload URL");
 
+    // No fixed timeout here — large files can take many minutes.
     const uploadRes = await fetch(uploadUrl, {
       method: "PUT",
-      headers: {
-        "Content-Type": mime,
-        "Content-Length": size.toString(),
-      },
+      headers: { "Content-Type": mime },
       body: buffer,
     });
 

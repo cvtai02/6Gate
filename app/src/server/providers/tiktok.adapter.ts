@@ -13,11 +13,11 @@ import {
   checkHttpOk,
   createDestinationForAccount,
 } from "./adapter-utils";
-import { ProviderType } from "@/lib/enums";
+import { ProviderType, TIKTOK_SCOPES } from "@/lib/enums";
 
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";
-export const TIKTOK_DEFAULT_SCOPES = "user.info.basic,user.info.profile,video.upload,video.publish";
+export const TIKTOK_DEFAULT_SCOPES = TIKTOK_SCOPES;
 
 function generateCodeVerifier(): string {
   return generateRandomString(43);
@@ -61,15 +61,17 @@ export class TikTokAdapter implements SocialProviderAdapter {
       .where(eq(providersTable.id, providerId));
     console.log("[TikTok PKCE debug] stored verifier len:", codeVerifier.length, "challenge:", codeChallenge, "providerId:", providerId);
 
-    const params = new URLSearchParams({
-      client_key: provider.clientId!,
-      redirect_uri: REDIRECT_URI,
-      response_type: "code",
-      scope: scopes,
-      state: providerId,
-      code_challenge: codeChallenge,
-      code_challenge_method: "S256",
-    });
+    // TikTok's OAuth screen expects literal commas in the scope param —
+    // URL-encoded commas (%2C) cause it to silently drop scopes.
+    const params = [
+      `client_key=${encodeURIComponent(provider.clientId!)}`,
+      `redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
+      `response_type=code`,
+      `scope=${scopes}`,
+      `state=${encodeURIComponent(providerId)}`,
+      `code_challenge=${encodeURIComponent(codeChallenge)}`,
+      `code_challenge_method=S256`,
+    ].join("&");
 
     return `${AUTH_URL}?${params}`;
   }
@@ -124,12 +126,43 @@ export class TikTokAdapter implements SocialProviderAdapter {
       throw new Error(`TikTok token exchange returned no access_token: ${JSON.stringify(tokens)}`);
     }
 
-    const userRes = await fetch(
-      "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_large_url,avatar_url,username,profile_deep_link",
-      { headers: { Authorization: `Bearer ${data.access_token}` } }
-    );
-    const userData = await userRes.json();
-    const user = userData.data?.user ?? {};
+    // Best-effort: user.info.basic may not be approved on the TikTok app yet.
+    // If the call fails we still create the account using token-level data.
+    type TikTokUser = {
+      open_id?: string;
+      union_id?: string;
+      display_name?: string;
+      username?: string;
+      avatar_url?: string;
+      avatar_url_100?: string;
+      avatar_large_url?: string;
+      bio_description?: string;
+      profile_deep_link?: string;
+      is_verified?: boolean;
+    };
+    let user: TikTokUser = {};
+    try {
+      const userRes = await fetch(
+        "https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,display_name,avatar_url,avatar_url_100,avatar_large_url,username,bio_description,profile_deep_link,is_verified",
+        {
+          signal: AbortSignal.timeout(30_000),
+          headers: { Authorization: `Bearer ${data.access_token}` },
+        }
+      );
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        if (!userData.error?.code || userData.error.code === "ok") {
+          user = userData.data?.user ?? {};
+        } else {
+          console.warn("[TikTok] user info error:", userData.error.code, userData.error.message);
+        }
+      } else {
+        const errText = await userRes.text().catch(() => `HTTP ${userRes.status}`);
+        console.warn("[TikTok] user info fetch failed:", errText);
+      }
+    } catch (e) {
+      console.warn("[TikTok] user info fetch threw:", e);
+    }
 
     const now = new Date().toISOString();
     const accountId = `acc_tt_${nanoid(8)}`;
@@ -151,7 +184,8 @@ export class TikTokAdapter implements SocialProviderAdapter {
       createdAt: now,
       updatedAt: now,
     });
-    await createDestinationForAccount(accountId, ProviderType.tiktok, displayName, externalId);
+    const avatarUrl = user.avatar_large_url ?? user.avatar_url ?? null;
+    await createDestinationForAccount(accountId, ProviderType.tiktok, displayName, externalId, avatarUrl);
   }
 
   async refreshToken(accountId: string): Promise<void> {

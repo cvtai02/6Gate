@@ -1,7 +1,7 @@
 import { handleCallback } from "@/server/auth/oauth-service";
 import { getDb } from "@/server/db";
-import { providers } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { providers, accounts } from "@/server/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 
@@ -46,6 +46,20 @@ export async function GET(req: NextRequest) {
   if (errorMsg) {
     redirect(`${returnBase}?error=${encodeURIComponent(errorMsg)}`);
   } else {
-    redirect(`${returnBase}?connected=1`);
+    // Find the account that was just created so the client can trigger a sync
+    let accountId: string | null = null;
+    try {
+      const db = getDb();
+      const latest = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(eq(accounts.providerId, providerId))
+        .orderBy(desc(accounts.createdAt))
+        .limit(1)
+        .get();
+      accountId = latest?.id ?? null;
+    } catch {}
+    const accountParam = accountId ? `&accountId=${accountId}` : "";
+    redirect(`${returnBase}?connected=1${accountParam}`);
   }
 }

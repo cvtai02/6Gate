@@ -1,3 +1,12 @@
+export const TikTokScope = {
+  userInfoBasic: "user.info.basic",
+  videoPublish: "video.publish",
+  videoUpload: "video.upload",
+} as const;
+export type TikTokScope = (typeof TikTokScope)[keyof typeof TikTokScope];
+
+export const TIKTOK_SCOPES = Object.values(TikTokScope).join(",");
+
 export const ProviderType = {
   meta: "meta",
   youtube: "youtube",

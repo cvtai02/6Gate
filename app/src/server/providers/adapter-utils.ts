@@ -16,7 +16,8 @@ export async function createDestinationForAccount(
   accountId: string,
   providerType: string,
   name: string,
-  externalId?: string | null
+  externalId?: string | null,
+  avatarUrl?: string | null
 ) {
   const db = getDb();
   await db.insert(publishDestinations).values({
@@ -25,6 +26,7 @@ export async function createDestinationForAccount(
     name,
     type: DESTINATION_TYPE[providerType] ?? `${providerType}_account`,
     externalId: externalId ?? null,
+    avatarUrl: avatarUrl ?? null,
     createdAt: new Date().toISOString(),
   });
 }

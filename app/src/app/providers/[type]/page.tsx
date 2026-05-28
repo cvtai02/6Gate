@@ -989,9 +989,18 @@ function ProviderDetailContent() {
     load();
     if (searchParams.get("connected")) {
       setFlash({ kind: "success", msg: "Account connected successfully!" });
+      const accountId = searchParams.get("accountId");
+      if (type === "tiktok" && accountId) {
+        fetch(`/api/accounts/${accountId}/sync`, { method: "POST" })
+          .then((r) => r.json())
+          .then((data) => { if (data.ok) load(); })
+          .catch(() => {});
+      }
+      router.replace(`/providers/${type}`);
     }
     if (searchParams.get("error")) {
       setFlash({ kind: "error", msg: decodeURIComponent(searchParams.get("error")!) });
+      router.replace(`/providers/${type}`);
     }
   }, [searchParams]);
 
