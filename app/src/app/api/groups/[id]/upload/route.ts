@@ -18,11 +18,24 @@ export async function POST(
 ) {
   const { id: groupId } = await params;
 
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    return Response.json(
+      {
+        error: "This endpoint requires multipart/form-data (with a 'video' file field). " +
+          "If you want to reference a video by absolute path on disk, POST JSON to /api/groups/{id}/upload-by-path instead.",
+        receivedContentType: contentType || null,
+      },
+      { status: 400 }
+    );
+  }
+
   let formData: FormData;
   try {
     formData = await req.formData();
-  } catch {
-    return Response.json({ error: "Invalid multipart form data" }, { status: 400 });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return Response.json({ error: "Failed to parse multipart form data", detail }, { status: 400 });
   }
 
   const file = formData.get("video") as File | null;

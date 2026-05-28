@@ -125,12 +125,12 @@ GET /api/post-jobs/{jobId}
 
 **Job statuses:**
 
-| Status    | Meaning                              |
-|-----------|--------------------------------------|
-| `queued`  | Waiting to be processed              |
-| `running` | Upload in progress                   |
-| `success` | Published; `providerPostUrl` is set  |
-| `failed`  | Failed; `errorMessage` is set        |
+| Status      | Meaning                                  |
+|-------------|------------------------------------------|
+| `queued`    | Waiting to be processed                  |
+| `running`   | Upload in progress                       |
+| `completed` | Published; `providerPostUrl` is set      |
+| `failed`    | Failed; `errorMessage` is set            |
 
 To retry a failed job:
 
@@ -138,10 +138,87 @@ To retry a failed job:
 POST /api/post-jobs/{jobId}/retry
 ```
 
-To stream live logs for a job:
+---
+
+## Live updates via SSE (recommended)
+
+Two Server-Sent Events streams are available. Prefer SSE over polling — the connection stays open and the server pushes events as they happen.
+
+### 1. Stream a single job
 
 ```
 GET /api/post-jobs/{jobId}/events
+Accept: text/event-stream
+```
+
+Sends past logs first, then live `log` and `status` events. The connection closes automatically once the job reaches `completed` or `failed`.
+
+Event types:
+
+```
+event: log
+data: {"level":"info","message":"Uploading video...","createdAt":"2025-01-15T10:01:02Z"}
+
+event: status
+data: {"status":"running"}
+
+event: status
+data: {"status":"completed","providerPostId":"abc123","providerPostUrl":"https://youtube.com/watch?v=abc123"}
+```
+
+### 2. Stream **all** jobs (global)
+
+```
+GET /api/post-jobs/stream
+Accept: text/event-stream
+```
+
+Best fit for a local app that wants a live dashboard of every job without polling. The first message is a `snapshot` of current jobs; afterward, every status change is pushed as a `status` event with the `jobId` included.
+
+Event sequence:
+
+```
+event: snapshot
+data: [{ "id":"job_Kp2mNx4qRs","status":"queued",... }, ...]
+
+event: status
+data: {"jobId":"job_Kp2mNx4qRs","status":"running"}
+
+event: status
+data: {"jobId":"job_Kp2mNx4qRs","status":"completed","providerPostId":"abc123","providerPostUrl":"https://youtube.com/watch?v=abc123"}
+
+event: status
+data: {"jobId":"job_RnA2Xy90Lp","status":"failed","errorMessage":"Account token expired"}
+```
+
+A comment line `: ping` is sent every 25 seconds as a heartbeat — ignore it. The connection stays open until the client disconnects.
+
+### Client example (browser / Electron)
+
+```js
+const es = new EventSource("http://localhost:20129/api/post-jobs/stream");
+
+es.addEventListener("snapshot", (e) => {
+  const jobs = JSON.parse(e.data);
+  // hydrate UI
+});
+
+es.addEventListener("status", (e) => {
+  const { jobId, status, providerPostUrl, errorMessage } = JSON.parse(e.data);
+  // update the row for jobId
+});
+
+es.onerror = () => {
+  // EventSource auto-reconnects; add exponential backoff if needed
+};
+```
+
+### Client example (Node.js)
+
+```js
+import { EventSource } from "eventsource"; // npm i eventsource
+const es = new EventSource("http://localhost:20129/api/post-jobs/stream");
+es.addEventListener("status", (e) => console.log(JSON.parse(e.data)));
 ```
 
 ---
@@ -162,8 +239,11 @@ curl -X POST http://localhost:20129/api/groups/group_Ab3Xy7Zq/upload-by-path \
     "privacy": "public"
   }'
 
-# 3. Poll job status
+# 3a. Poll job status (simple)
 curl http://localhost:20129/api/post-jobs/job_Kp2mNx4qRs
+
+# 3b. OR subscribe to live updates for all jobs (recommended)
+curl -N http://localhost:20129/api/post-jobs/stream
 ```
 
 ---

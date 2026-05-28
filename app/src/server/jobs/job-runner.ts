@@ -65,13 +65,16 @@ async function processNextJob() {
       providerPostId: result.providerPostId,
       providerPostUrl: result.url,
     });
-    emitStatus(job.id, "completed");
+    emitStatus(job.id, "completed", {
+      providerPostId: result.providerPostId,
+      providerPostUrl: result.url,
+    });
     await appendLog(job.id, "info", "Job completed successfully");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await appendLog(job.id, "error", `Job failed: ${message}`);
     await updateJobStatus(job.id, "failed", { errorMessage: message });
-    emitStatus(job.id, "failed");
+    emitStatus(job.id, "failed", { errorMessage: message });
   } finally {
     running = false;
   }
@@ -90,7 +93,7 @@ async function resetOrphanedJobs() {
     if (!fs.existsSync(job.videoPath)) {
       await appendLog(job.id, "error", "Job interrupted by server restart; video file no longer exists");
       await updateJobStatus(job.id, "failed", { errorMessage: "Interrupted by server restart — video file is gone" });
-      emitStatus(job.id, "failed");
+      emitStatus(job.id, "failed", { errorMessage: "Interrupted by server restart — video file is gone" });
     } else {
       await appendLog(job.id, "info", "Job re-queued after server restart");
       await updateJobStatus(job.id, "queued");
