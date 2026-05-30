@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import fs from "fs";
 import { getDb } from "@/server/db";
 import { accounts, publishDestinations } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -7,11 +8,12 @@ import {
   REDIRECT_URI,
   getProviderRecord,
   getAccountRecord,
-  readVideoFile,
   checkHttpOk,
 } from "./adapter-utils";
-import { ProviderType, DestinationType } from "@/lib/enums";
+import { ProviderType, DestinationType, PublishStatus } from "@/lib/enums";
 import { syncInstagramForPage, syncThreadsForUser } from "./meta-ig-threads";
+import { appendLog } from "@/server/jobs/log-service";
+import { getJob } from "@/server/jobs/job-service";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";
@@ -197,7 +199,6 @@ export class FacebookAdapter implements SocialProviderAdapter {
     let pageToken: string;
 
     if (input.destinationId) {
-      // Preferred path: get page ID and token from the destination record
       const dest = await db
         .select()
         .from(publishDestinations)
@@ -209,7 +210,6 @@ export class FacebookAdapter implements SocialProviderAdapter {
       pageId = dest.externalId;
       pageToken = dest.accessToken;
     } else {
-      // Legacy fallback: account IS the page (old one-account-per-page model)
       const account = await getAccountRecord(input.accountId);
       if (!account.providerAccountId) throw new Error("Account has no page ID");
       if (!account.accessToken) throw new Error("Account has no page token");
@@ -217,32 +217,283 @@ export class FacebookAdapter implements SocialProviderAdapter {
       pageToken = account.accessToken;
     }
 
-    const { buffer, mime } = readVideoFile(input.videoPath);
+    // Branch by content type — Reel uses /video_reels with the rupload URL flow,
+    // normal Page video uses /videos with start/transfer/finish phases.
+    if ((input.contentType ?? "Video") === "Reel") {
+      return this.#publishReel(input, pageId, pageToken);
+    }
+    return this.#publishPageVideo(input, pageId, pageToken);
+  }
 
-    const formData = new FormData();
-    formData.append("access_token", pageToken);
-    formData.append("title", input.title ?? "");
-    formData.append("description", input.caption ?? "");
-    formData.append(
+  /**
+   * Facebook Page video — chunked upload via /videos with upload_phase=start/transfer/finish,
+   * then poll /{video-id}?fields=status until processing succeeds. Per the resilient-job plan.
+   */
+  async #publishPageVideo(
+    input: PublishVideoInput,
+    pageId: string,
+    pageToken: string
+  ): Promise<PublishVideoResult> {
+    const log = (msg: string) => this.#log(input.jobId, msg);
+    const fileSize = fs.statSync(input.videoPath).size;
+    await log(`Page video upload — ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
+
+    // Phase 1: start — Facebook tells us the chunk boundaries.
+    await this.#throwIfCancelled(input.jobId);
+    await log("Phase 1/4: requesting upload session");
+    const startBody = new URLSearchParams({
+      upload_phase: "start",
+      file_size: String(fileSize),
+      access_token: pageToken,
+    });
+    const startRes = await fetch(`${GRAPH_VIDEO}/${pageId}/videos`, {
+      method: "POST",
+      signal: AbortSignal.timeout(30_000),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: startBody,
+    });
+    if (!startRes.ok) throw await readFbError(startRes, "start phase");
+    await this.#throwIfCancelled(input.jobId);
+    const startData = await startRes.json();
+    const videoId: string = startData.video_id;
+    const uploadSessionId: string = startData.upload_session_id;
+    let curStart = Number(startData.start_offset);
+    let curEnd = Number(startData.end_offset);
+    await log(`Got video_id=${videoId}, session=${uploadSessionId}`);
+
+    // Phase 2: transfer chunks until start_offset == end_offset.
+    await this.#throwIfCancelled(input.jobId);
+    await log(`Phase 2/4: transferring chunks`);
+    const fd = fs.openSync(input.videoPath, "r");
+    try {
+      while (curStart < curEnd) {
+        await this.#throwIfCancelled(input.jobId);
+        const chunkSize = curEnd - curStart;
+        const buf = Buffer.alloc(chunkSize);
+        fs.readSync(fd, buf, 0, chunkSize, curStart);
+
+        const transferForm = new FormData();
+        transferForm.append("upload_phase", "transfer");
+        transferForm.append("upload_session_id", uploadSessionId);
+        transferForm.append("start_offset", String(curStart));
+        transferForm.append("access_token", pageToken);
+        transferForm.append(
+          "video_file_chunk",
+          new Blob([buf], { type: "application/octet-stream" }),
+          "chunk"
+        );
+
+        const transferRes = await fetch(`${GRAPH_VIDEO}/${pageId}/videos`, {
+          method: "POST",
+          signal: AbortSignal.timeout(300_000),
+          body: transferForm,
+        });
+        if (!transferRes.ok) throw await readFbError(transferRes, "transfer chunk");
+        await this.#throwIfCancelled(input.jobId);
+
+        const transferData = await transferRes.json();
+        curStart = Number(transferData.start_offset);
+        curEnd = Number(transferData.end_offset);
+
+        const pct = ((curStart / fileSize) * 100).toFixed(0);
+        await log(`Uploaded ${curStart.toLocaleString()}/${fileSize.toLocaleString()} bytes (${pct}%)`);
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    // Phase 3: finish — commit the upload with metadata.
+    await this.#throwIfCancelled(input.jobId);
+    await log("Phase 3/4: finishing upload");
+    const finishBody = new URLSearchParams({
+      upload_phase: "finish",
+      upload_session_id: uploadSessionId,
+      access_token: pageToken,
+    });
+    if (input.title) finishBody.append("title", input.title);
+    if (input.caption) finishBody.append("description", input.caption);
+    finishBody.append(
       "privacy",
       JSON.stringify({ value: PRIVACY_MAP[input.privacy ?? "private"] ?? "SELF" })
     );
-    formData.append(
-      "source",
-      new Blob([buffer], { type: mime }),
-      "video.mp4"
-    );
 
-    const uploadRes = await fetch(`${GRAPH_VIDEO}/${pageId}/videos`, {
+    const finishRes = await fetch(`${GRAPH_VIDEO}/${pageId}/videos`, {
       method: "POST",
-      body: formData,
+      signal: AbortSignal.timeout(60_000),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: finishBody,
     });
-    await checkHttpOk(uploadRes, "Facebook video upload");
-    const { id: videoId } = await uploadRes.json();
+    if (!finishRes.ok) throw await readFbError(finishRes, "finish phase");
+    await this.#throwIfCancelled(input.jobId);
+
+    // Phase 4: poll processing status.
+    await log("Phase 4/4: waiting for Facebook to finish processing");
+    await this.#pollVideoStatus(videoId, pageToken, input.jobId);
 
     return {
       providerPostId: videoId,
       url: `https://www.facebook.com/${pageId}/videos/${videoId}/`,
     };
   }
+
+  /**
+   * Facebook Page Reel — start /video_reels (gets upload_url + video_id) → POST binary
+   * to upload_url → finish with video_state=PUBLISHED → poll status.
+   */
+  async #publishReel(
+    input: PublishVideoInput,
+    pageId: string,
+    pageToken: string
+  ): Promise<PublishVideoResult> {
+    const log = (msg: string) => this.#log(input.jobId, msg);
+    const fileSize = fs.statSync(input.videoPath).size;
+    await log(`Reel upload — ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
+
+    // Phase 1: start
+    await this.#throwIfCancelled(input.jobId);
+    await log("Phase 1/4: starting Reel session");
+    const startRes = await fetch(
+      `${GRAPH}/${pageId}/video_reels?upload_phase=start&access_token=${encodeURIComponent(pageToken)}`,
+      { method: "POST", signal: AbortSignal.timeout(30_000) }
+    );
+    if (!startRes.ok) throw await readFbError(startRes, "Reel start");
+    await this.#throwIfCancelled(input.jobId);
+    const startData = await startRes.json();
+    const videoId: string = startData.video_id;
+    const uploadUrl: string = startData.upload_url;
+    await log(`Got video_id=${videoId}`);
+
+    // Phase 2: upload binary to rupload URL — single POST with OAuth + offset + file_size headers.
+    await this.#throwIfCancelled(input.jobId);
+    await log("Phase 2/4: uploading binary to rupload URL");
+    const videoBuf = fs.readFileSync(input.videoPath);
+    const uploadRes = await fetch(uploadUrl, {
+      method: "POST",
+      signal: AbortSignal.timeout(10 * 60_000),
+      headers: {
+        Authorization: `OAuth ${pageToken}`,
+        offset: "0",
+        file_size: String(fileSize),
+      },
+      body: videoBuf,
+    });
+    if (!uploadRes.ok) throw await readFbError(uploadRes, "Reel binary upload");
+    await this.#throwIfCancelled(input.jobId);
+    await log("Binary upload complete");
+
+    // Phase 3: finish — video_state=PUBLISHED unless privacy=private (then DRAFT).
+    await this.#throwIfCancelled(input.jobId);
+    await log("Phase 3/4: finishing Reel");
+    const videoState = input.privacy === "private" ? "DRAFT" : "PUBLISHED";
+    const finishParams = new URLSearchParams({
+      video_id: videoId,
+      upload_phase: "finish",
+      video_state: videoState,
+      access_token: pageToken,
+    });
+    if (input.caption) finishParams.append("description", input.caption);
+
+    const finishRes = await fetch(
+      `${GRAPH}/${pageId}/video_reels?${finishParams}`,
+      { method: "POST", signal: AbortSignal.timeout(60_000) }
+    );
+    if (!finishRes.ok) throw await readFbError(finishRes, "Reel finish");
+    await this.#throwIfCancelled(input.jobId);
+
+    // Phase 4: poll status
+    await log("Phase 4/4: waiting for Facebook to finish processing");
+    await this.#pollVideoStatus(videoId, pageToken, input.jobId);
+
+    return {
+      providerPostId: videoId,
+      url: `https://www.facebook.com/reel/${videoId}`,
+    };
+  }
+
+  /**
+   * Poll GET /{video-id}?fields=status until video_status reaches "ready" or "error".
+   * Returns silently on timeout — the upload itself succeeded, processing just takes longer.
+   */
+  async #pollVideoStatus(
+    videoId: string,
+    accessToken: string,
+    jobId: string | undefined
+  ): Promise<void> {
+    const MAX_ATTEMPTS = 40; // ~10 min at the cap
+    let lastReported = "";
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      await this.#throwIfCancelled(jobId);
+      // 5s, 7s, 9s, ... cap at 20s
+      const waitMs = Math.min(20_000, 5_000 + i * 2_000);
+      await new Promise((r) => setTimeout(r, waitMs));
+      await this.#throwIfCancelled(jobId);
+
+      const res = await fetch(
+        `${GRAPH}/${videoId}?fields=status&access_token=${encodeURIComponent(accessToken)}`,
+        { signal: AbortSignal.timeout(30_000) }
+      );
+      await this.#throwIfCancelled(jobId);
+      if (!res.ok) continue; // transient — keep polling
+
+      const body = await res.json().catch(() => ({}));
+      const vs: string | undefined = body.status?.video_status;
+      const ps: string | undefined = body.status?.processing_phase?.status;
+
+      if (vs && vs !== lastReported) {
+        await this.#log(jobId, `Facebook status: ${vs}${ps ? ` (${ps})` : ""}`);
+        lastReported = vs;
+      }
+
+      if (vs === "ready") return;
+      if (vs === "error") {
+        throw new Error(
+          `Facebook video processing failed: ${JSON.stringify(body.status)}`
+        );
+      }
+      // "processing" / unknown → loop
+    }
+
+    await this.#log(
+      jobId,
+      "Facebook processing did not complete within poll window; the video may still appear shortly"
+    );
+  }
+
+  async #log(jobId: string | undefined, msg: string): Promise<void> {
+    if (!jobId) return;
+    try {
+      await appendLog(jobId, "info", msg);
+    } catch {
+      /* logging is best-effort; never let it derail the upload */
+    }
+  }
+
+  async #throwIfCancelled(jobId: string | undefined): Promise<void> {
+    if (!jobId) return;
+    const job = await getJob(jobId);
+    if (job?.status === PublishStatus.Cancelled) {
+      throw new Error("Job cancelled");
+    }
+  }
+}
+
+/** Pull a useful error message from a Meta Graph API error response. */
+async function readFbError(res: Response, phase: string): Promise<Error> {
+  const text = await res.text().catch(() => `HTTP ${res.status}`);
+  try {
+    const json = JSON.parse(text);
+    const e = json.error;
+    if (e) {
+      const parts = [
+        `Facebook ${phase} failed: ${e.message}`,
+        e.code !== undefined ? `code=${e.code}` : null,
+        e.error_subcode !== undefined ? `subcode=${e.error_subcode}` : null,
+        e.fbtrace_id ? `trace=${e.fbtrace_id}` : null,
+      ].filter(Boolean);
+      return new Error(parts.join(" "));
+    }
+  } catch {
+    /* not JSON — fall through */
+  }
+  return new Error(`Facebook ${phase} failed (${res.status}): ${text.slice(0, 500)}`);
 }

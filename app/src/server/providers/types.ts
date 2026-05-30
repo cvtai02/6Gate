@@ -7,6 +7,10 @@ export type PublishVideoInput = {
   caption?: string;
   privacy?: "private" | "public" | "unlisted";
   scheduledAt?: string;
+  /** Internal job id. When set, adapters MAY call appendLog(jobId, ...) for live progress. */
+  jobId?: string;
+  /** Video (default) or Reel. Currently only Meta/Facebook Page distinguishes these. */
+  contentType?: "Video" | "Reel";
 };
 
 export type PublishVideoResult = {

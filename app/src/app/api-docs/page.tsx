@@ -74,7 +74,7 @@ const SECTIONS: Section[] = [
       { method: "POST", path: "/api/groups/:id/destinations", description: "Add a destination to the group.", body: `{ destinationId }` },
       { method: "DELETE", path: "/api/groups/:id/destinations/:destinationId", description: "Remove a destination from the group." },
       { method: "POST", path: "/api/groups/:id/upload", description: "Upload a video for the group (multipart)." },
-      { method: "POST", path: "/api/groups/:id/publish", description: "Fan out a publish job to every destination in the group.", body: `{ videoPath, title?, caption?, privacy?, scheduledAt? }` },
+      { method: "POST", path: "/api/groups/:id/upload-by-path", description: "Create one publish job per group destination from a server-local video path.", body: `{ videoPath, title?, caption?, privacy? }` },
     ],
   },
   {
@@ -85,7 +85,8 @@ const SECTIONS: Section[] = [
       { method: "POST", path: "/api/post-jobs", description: "Create a single publish job.", body: `{ accountId, videoPath, destinationId?, title?, caption?, privacy?, scheduledAt? }` },
       { method: "GET", path: "/api/post-jobs/:id", description: "Get a job along with its logs." },
       { method: "DELETE", path: "/api/post-jobs/:id", description: "Delete a job." },
-      { method: "POST", path: "/api/post-jobs/:id/retry", description: "Re-queue a failed job." },
+      { method: "POST", path: "/api/post-jobs/:id/retry", description: "Re-queue a non-success terminal job." },
+      { method: "POST", path: "/api/post-jobs/:id/cancel", description: "Cancel a queued or active destination upload job." },
       { method: "GET", path: "/api/post-jobs/:id/events", description: "Server-sent events stream for live status and log updates.", notes: "text/event-stream — connect with EventSource." },
     ],
   },

@@ -55,7 +55,7 @@ export function LiveLogView({
     es.addEventListener("status", (e) => {
       const { status } = JSON.parse(e.data) as { status: string };
       setLiveStatus(status);
-      if (["completed", "failed", "cancelled"].includes(status)) {
+      if (["Published", "Failed", "Cancelled"].includes(status)) {
         es.close();
         setConnected(false);
       }

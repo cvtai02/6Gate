@@ -139,4 +139,45 @@ export function runMigrations(db: any) {
       UNIQUE (combo_id, destination_id)
     )
   `);
+
+  // Resilient-job columns on post_jobs (idempotent — wrap each ALTER in try/catch)
+  const postJobsColumns: [string, string][] = [
+    ["content_type", "TEXT"],
+    ["upload_session_id", "TEXT"],
+    ["upload_session_url", "TEXT"],
+    ["upload_url", "TEXT"],
+    ["start_offset", "TEXT"],
+    ["end_offset", "TEXT"],
+    ["uploaded_bytes", "TEXT"],
+    ["total_bytes", "TEXT"],
+    ["attempt_count", "TEXT"],
+    ["max_attempts", "TEXT"],
+    ["next_attempt_at", "TEXT"],
+    ["last_status_checked_at", "TEXT"],
+    ["last_error_code", "TEXT"],
+    ["last_error_subcode", "TEXT"],
+    ["last_network_error", "TEXT"],
+    ["last_trace_id", "TEXT"],
+    ["reconnect_required_reason", "TEXT"],
+    ["idempotency_key", "TEXT"],
+    ["published_at", "TEXT"],
+  ];
+  for (const [name, type] of postJobsColumns) {
+    try { db.run(`ALTER TABLE post_jobs ADD COLUMN ${name} ${type}`); } catch {}
+  }
+
+  // Unique index for idempotency lookup; NULLs are allowed and don't collide.
+  try {
+    db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_post_jobs_idempotency_key ON post_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL`);
+  } catch {}
+
+  // Backfill legacy lowercase status values to the new PublishStatus enum.
+  // queued    → Created
+  // running   → Uploading   (the old runner did the upload phase under this label)
+  // completed → Published
+  // failed    → Failed       (case-only change)
+  db.run(`UPDATE post_jobs SET status = 'Created'   WHERE status = 'queued'`);
+  db.run(`UPDATE post_jobs SET status = 'Uploading' WHERE status = 'running'`);
+  db.run(`UPDATE post_jobs SET status = 'Published' WHERE status = 'completed'`);
+  db.run(`UPDATE post_jobs SET status = 'Failed'    WHERE status = 'failed'`);
 }

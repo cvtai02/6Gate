@@ -33,15 +33,47 @@ export const postJobs = sqliteTable("post_jobs", {
   accountId: text("account_id").notNull(),
   destinationId: text("destination_id"),
   platform: text("platform").notNull(),
+  /** Video | Reel — Reel currently only applies to Meta/Facebook Page. */
+  contentType: text("content_type"),
+  /** PublishStatus enum (see lib/enums.ts). */
   status: text("status").notNull(),
   videoPath: text("video_path").notNull(),
   title: text("title"),
   caption: text("caption"),
   privacy: text("privacy"),
   scheduledAt: text("scheduled_at"),
-  providerPostId: text("provider_post_id"),
+
+  // Provider-side handles captured during the publish flow.
+  providerPostId: text("provider_post_id"),       // TikTok publish_id (later post_id), YouTube videoId, FB video_id
   providerPostUrl: text("provider_post_url"),
+  uploadSessionId: text("upload_session_id"),     // FB Page video chunked upload session
+  uploadSessionUrl: text("upload_session_url"),   // YouTube resumable upload URL
+  uploadUrl: text("upload_url"),                  // FB Reel rupload URL
+  startOffset: text("start_offset"),              // FB chunked transfer cursor (string in API)
+  endOffset: text("end_offset"),
+
+  // Progress
+  uploadedBytes: text("uploaded_bytes"),          // stored as text to avoid int64 round-trip
+  totalBytes: text("total_bytes"),
+
+  // Retry & status-poll bookkeeping
+  attemptCount: text("attempt_count"),            // string-encoded int
+  maxAttempts: text("max_attempts"),
+  nextAttemptAt: text("next_attempt_at"),
+  lastStatusCheckedAt: text("last_status_checked_at"),
+
+  // Error detail
   errorMessage: text("error_message"),
+  lastErrorCode: text("last_error_code"),
+  lastErrorSubcode: text("last_error_subcode"),
+  lastNetworkError: text("last_network_error"),
+  lastTraceId: text("last_trace_id"),
+  reconnectRequiredReason: text("reconnect_required_reason"),
+
+  // Idempotency — unique constraint enforced in migrate.ts
+  idempotencyKey: text("idempotency_key"),
+
+  publishedAt: text("published_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

@@ -6,7 +6,6 @@ import { eq, desc } from "drizzle-orm";
 export type LogLevel = "info" | "warn" | "error";
 
 const subscribers = new Map<string, Set<(event: string) => void>>();
-const globalSubscribers = new Set<(event: string) => void>();
 
 export function subscribeToJob(jobId: string, callback: (event: string) => void): () => void {
   if (!subscribers.has(jobId)) {
@@ -22,20 +21,9 @@ export function subscribeToJob(jobId: string, callback: (event: string) => void)
   };
 }
 
-export function subscribeToAllJobs(callback: (event: string) => void): () => void {
-  globalSubscribers.add(callback);
-  return () => {
-    globalSubscribers.delete(callback);
-  };
-}
-
 function emit(jobId: string, eventType: string, data: Record<string, unknown>) {
   const perJobMsg = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
   subscribers.get(jobId)?.forEach((cb) => cb(perJobMsg));
-
-  // Global channel always includes jobId so consumers can route events
-  const globalMsg = `event: ${eventType}\ndata: ${JSON.stringify({ jobId, ...data })}\n\n`;
-  globalSubscribers.forEach((cb) => cb(globalMsg));
 }
 
 export async function appendLog(jobId: string, level: LogLevel, message: string) {

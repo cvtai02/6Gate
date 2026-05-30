@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { LiveLogView } from "@/components/live-log-view";
 import { RetryButton } from "./retry-button";
+import { CancelButton } from "./cancel-button";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,16 @@ export const dynamic = "force-dynamic";
 const STATUS_META: Record<string, {
   label: string; dot: string; bg: string; text: string; border: string;
 }> = {
-  queued:    { label: "Queued",    dot: "bg-yellow-400",            bg: "bg-yellow-500/10", text: "text-yellow-400", border: "border-yellow-500/25" },
-  running:   { label: "Running",   dot: "bg-blue-400 animate-pulse", bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/25"   },
-  completed: { label: "Completed", dot: "bg-green-400",             bg: "bg-green-500/10",  text: "text-green-400",  border: "border-green-500/25"  },
-  failed:    { label: "Failed",    dot: "bg-red-400",               bg: "bg-red-500/10",    text: "text-red-400",    border: "border-red-500/25"    },
+  Created:           { label: "Queued",            dot: "bg-yellow-400",                  bg: "bg-yellow-500/10", text: "text-yellow-400", border: "border-yellow-500/25" },
+  Initializing:      { label: "Initializing",      dot: "bg-blue-400 animate-pulse",      bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/25"   },
+  Uploading:         { label: "Uploading",         dot: "bg-blue-400 animate-pulse",      bg: "bg-blue-500/10",   text: "text-blue-400",   border: "border-blue-500/25"   },
+  Finishing:         { label: "Finishing",         dot: "bg-indigo-400 animate-pulse",    bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/25" },
+  Processing:        { label: "Processing",        dot: "bg-indigo-400 animate-pulse",    bg: "bg-indigo-500/10", text: "text-indigo-400", border: "border-indigo-500/25" },
+  Retrying:          { label: "Retrying",          dot: "bg-amber-400 animate-pulse",     bg: "bg-amber-500/10",  text: "text-amber-400",  border: "border-amber-500/25"  },
+  Published:         { label: "Published",         dot: "bg-green-400",                   bg: "bg-green-500/10",  text: "text-green-400",  border: "border-green-500/25"  },
+  Failed:            { label: "Failed",            dot: "bg-red-400",                     bg: "bg-red-500/10",    text: "text-red-400",    border: "border-red-500/25"    },
+  ReconnectRequired: { label: "Reconnect",         dot: "bg-orange-400",                  bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/25" },
+  Cancelled:         { label: "Cancelled",         dot: "bg-gray-400",                    bg: "bg-gray-500/10",   text: "text-gray-400",   border: "border-gray-500/25"   },
 };
 
 const PLATFORM_CHIP: Record<string, string> = {
@@ -61,8 +68,10 @@ export default async function JobDetailPage({
     ? await db.select().from(providers).where(eq(providers.id, account.providerId)).get()
     : null;
 
-  const sm = STATUS_META[job.status] ?? STATUS_META.queued;
-  const isDone = job.status === "completed" || job.status === "failed";
+  const sm = STATUS_META[job.status] ?? STATUS_META.Created;
+  const isDone = ["Published", "Failed", "Cancelled"].includes(job.status);
+  const canCancel = ["Created", "Initializing", "Uploading", "Finishing", "Processing", "Retrying", "ReconnectRequired"].includes(job.status);
+  const canRetry = ["Failed", "Cancelled", "ReconnectRequired"].includes(job.status);
   const startedAt = logs[0]?.createdAt ?? null;
   const endedAt = isDone ? (logs[logs.length - 1]?.createdAt ?? job.updatedAt) : null;
 
@@ -83,7 +92,7 @@ export default async function JobDetailPage({
   const timeline = [
     { label: "Queued",   time: job.createdAt, done: true },
     { label: "Started",  time: startedAt,      done: !!startedAt },
-    { label: job.status === "failed" ? "Failed" : "Completed", time: endedAt, done: isDone },
+    { label: job.status === "Failed" ? "Failed" : job.status === "Cancelled" ? "Cancelled" : "Published", time: endedAt, done: isDone },
   ];
 
   return (
@@ -111,7 +120,7 @@ export default async function JobDetailPage({
               <span className={`w-1.5 h-1.5 rounded-full ${sm.dot}`} />
               {sm.label}
             </span>
-            {job.status === "completed" && job.providerPostUrl && (
+            {job.status === "Published" && job.providerPostUrl && (
               <a
                 href={job.providerPostUrl}
                 target="_blank"
@@ -126,7 +135,7 @@ export default async function JobDetailPage({
       </div>
 
       {/* ── Error alert ── */}
-      {job.status === "failed" && job.errorMessage && (
+      {(job.status === "Failed" || job.status === "ReconnectRequired") && job.errorMessage && (
         <div className="flex gap-3 rounded-xl border border-red-500/30 bg-red-500/[0.08] px-4 py-3.5">
           <span className="text-red-400 text-base leading-none mt-0.5 shrink-0">✕</span>
           <div className="min-w-0">
@@ -154,7 +163,8 @@ export default async function JobDetailPage({
 
         {/* Sidebar */}
         <div className="col-span-2 flex flex-col gap-4">
-          {job.status === "failed" && <RetryButton jobId={id} />}
+          {canCancel && <CancelButton jobId={id} />}
+          {canRetry && <RetryButton jobId={id} />}
 
           {/* Timeline */}
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-5 flex-1">

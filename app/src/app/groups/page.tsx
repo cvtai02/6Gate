@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getDestinationIconPath } from "@/lib/destination-icons";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -64,7 +65,16 @@ const TYPE_LABEL: Record<string, string> = {
 
 const TYPE_ORDER = ["youtube_channel", "facebook_page", "instagram_account", "threads_profile", "tiktok_account"];
 
-function DestBadge({ type }: { type: string }) {
+function DestBadge({ type, providerType }: { type: string; providerType?: string | null }) {
+  const iconPath = getDestinationIconPath(type, providerType);
+  if (iconPath) {
+    return (
+      <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center shrink-0 p-1.5">
+        <img src={iconPath} alt="" className="w-full h-full object-contain" />
+      </div>
+    );
+  }
+
   const bg = TYPE_COLORS[type] ?? "bg-gray-700";
   const abbr = TYPE_ABBR[type] ?? type.slice(0, 2).toUpperCase();
   return (
@@ -74,7 +84,7 @@ function DestBadge({ type }: { type: string }) {
   );
 }
 
-function DestAvatar({ type, avatarUrl }: { type: string; avatarUrl?: string | null }) {
+function DestAvatar({ type, avatarUrl, providerType }: { type: string; avatarUrl?: string | null; providerType?: string | null }) {
   const [errored, setErrored] = useState(false);
   if (avatarUrl && !errored) {
     return (
@@ -86,7 +96,7 @@ function DestAvatar({ type, avatarUrl }: { type: string; avatarUrl?: string | nu
       />
     );
   }
-  return <DestBadge type={type} />;
+  return <DestBadge type={type} providerType={providerType} />;
 }
 
 /* ── Tooltip ─────────────────────────────────────────────────────────────── */
@@ -110,23 +120,49 @@ type JobResult = {
   destinationId: string;
   destinationName: string;
   platform: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status:
+    | "Created"
+    | "Initializing"
+    | "Uploading"
+    | "Finishing"
+    | "Processing"
+    | "Retrying"
+    | "Published"
+    | "Failed"
+    | "ReconnectRequired"
+    | "Cancelled";
   providerPostUrl?: string | null;
   errorMessage?: string | null;
 };
 
+const TERMINAL = ["Published", "Failed", "Cancelled"] as const;
+const ACTIVE = ["Created", "Initializing", "Uploading", "Finishing", "Processing", "Retrying"] as const;
+const CANCELLABLE = ["Created", "Initializing", "Uploading", "Finishing", "Processing", "Retrying"] as const;
+
 const JOB_STATUS_COLOR: Record<string, string> = {
-  queued: "text-gray-400",
-  running: "text-indigo-400",
-  completed: "text-green-400",
-  failed: "text-red-400",
+  Created:           "text-gray-400",
+  Initializing:      "text-indigo-400",
+  Uploading:         "text-indigo-400",
+  Finishing:         "text-indigo-400",
+  Processing:        "text-indigo-400",
+  Retrying:          "text-amber-400",
+  Published:         "text-green-400",
+  Failed:            "text-red-400",
+  ReconnectRequired: "text-orange-400",
+  Cancelled:         "text-gray-400",
 };
 
 const JOB_STATUS_BORDER: Record<string, string> = {
-  queued: "border-white/10 bg-white/[.03]",
-  running: "border-indigo-500/20 bg-indigo-500/5",
-  completed: "border-green-500/20 bg-green-500/5",
-  failed: "border-red-500/20 bg-red-500/5",
+  Created:           "border-white/10 bg-white/[.03]",
+  Initializing:      "border-indigo-500/20 bg-indigo-500/5",
+  Uploading:         "border-indigo-500/20 bg-indigo-500/5",
+  Finishing:         "border-indigo-500/20 bg-indigo-500/5",
+  Processing:        "border-indigo-500/20 bg-indigo-500/5",
+  Retrying:          "border-amber-500/20 bg-amber-500/5",
+  Published:         "border-green-500/20 bg-green-500/5",
+  Failed:            "border-red-500/20 bg-red-500/5",
+  ReconnectRequired: "border-orange-500/20 bg-orange-500/5",
+  Cancelled:         "border-white/10 bg-white/[.03]",
 };
 
 function PrivacyRadios({ privacy, setPrivacy }: { privacy: string; setPrivacy: (v: "public" | "private" | "unlisted") => void }) {
@@ -201,13 +237,13 @@ function UploadModal({ groupId, groupName, onClose }: { groupId: string; groupNa
   // Poll all pending jobs every 2s until all are terminal
   useEffect(() => {
     if (!jobs) return;
-    const pending = jobs.filter((j) => j.status === "queued" || j.status === "running");
+    const pending = jobs.filter((j) => (ACTIVE as readonly string[]).includes(j.status));
     if (pending.length === 0) return;
 
     const id = setInterval(async () => {
       const updated = await Promise.all(
         jobs.map(async (j) => {
-          if (j.status === "completed" || j.status === "failed") return j;
+          if ((TERMINAL as readonly string[]).includes(j.status) || j.status === "ReconnectRequired") return j;
           try {
             const res = await fetch(`/api/post-jobs/${j.id}`);
             if (!res.ok) return j;
@@ -248,7 +284,7 @@ function UploadModal({ groupId, groupName, onClose }: { groupId: string; groupNa
         setJobs(
           (data.jobs ?? []).map((j: { id: string; destinationId: string; destinationName: string; platform: string }) => ({
             ...j,
-            status: "queued" as const,
+            status: "Created" as const,
           }))
         );
       }
@@ -259,8 +295,24 @@ function UploadModal({ groupId, groupName, onClose }: { groupId: string; groupNa
     }
   }
 
-  const doneCount = jobs?.filter((j) => j.status === "completed" || j.status === "failed").length ?? 0;
+  const doneCount = jobs?.filter((j) => (TERMINAL as readonly string[]).includes(j.status) || j.status === "ReconnectRequired").length ?? 0;
   const allDone = jobs ? doneCount === jobs.length : false;
+
+  async function cancelJob(jobId: string) {
+    try {
+      const res = await fetch(`/api/post-jobs/${jobId}/cancel`, { method: "POST" });
+      if (!res.ok) return;
+      setJobs((current) =>
+        current?.map((job) =>
+          job.id === jobId
+            ? { ...job, status: "Cancelled", errorMessage: null }
+            : job
+        ) ?? null
+      );
+    } catch {
+      /* polling will surface any persistent state */
+    }
+  }
 
   return (
     <div
@@ -293,7 +345,7 @@ function UploadModal({ groupId, groupName, onClose }: { groupId: string; groupNa
               {jobs.map((j) => (
                 <div key={j.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${JOB_STATUS_BORDER[j.status] ?? "border-white/10"}`}>
                   <span className={`text-xs mt-0.5 shrink-0 tabular-nums ${JOB_STATUS_COLOR[j.status]}`}>
-                    {j.status === "completed" ? "✓" : j.status === "failed" ? "✕" : j.status === "running" ? "▶" : "·"}
+                    {j.status === "Published" ? "✓" : j.status === "Failed" ? "✕" : j.status === "Cancelled" ? "✕" : j.status === "ReconnectRequired" ? "⚠" : (ACTIVE as readonly string[]).includes(j.status) && j.status !== "Created" ? "▶" : "·"}
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -309,6 +361,15 @@ function UploadModal({ groupId, groupName, onClose }: { groupId: string; groupNa
                       <p className="text-xs text-red-400 truncate">{j.errorMessage}</p>
                     )}
                   </div>
+                  {(CANCELLABLE as readonly string[]).includes(j.status) && (
+                    <button
+                      type="button"
+                      onClick={() => cancelJob(j.id)}
+                      className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded-md border border-red-500/30 hover:border-red-400/50 transition-colors shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -578,7 +639,7 @@ function AddDestinationModal({
                       disabled={adding === dest.id}
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors text-left disabled:opacity-50"
                     >
-                      <DestAvatar type={dest.type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} />
+                      <DestAvatar type={dest.type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} providerType={dest.providerType} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white truncate">{dest.name}</p>
                         {dest.accountUsername && (
@@ -629,6 +690,7 @@ function GroupCard({
   const [saving, setSaving] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   async function saveName() {
     if (!draft.trim() || draft === group.name) { setEditing(false); return; }
@@ -646,6 +708,12 @@ function GroupCard({
   async function removeDestination(destinationId: string) {
     await fetch(`/api/groups/${group.id}/destinations/${destinationId}`, { method: "DELETE" });
     onUpdate();
+  }
+
+  async function copyGroupId() {
+    await navigator.clipboard.writeText(group.id);
+    setCopiedId(true);
+    window.setTimeout(() => setCopiedId(false), 1400);
   }
 
   const existingIds = new Set(group.destinations.map((d) => d.destinationId));
@@ -695,15 +763,27 @@ function GroupCard({
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-white">{group.name}</p>
-              <button
-                onClick={() => { setDraft(group.name); setEditing(true); }}
-                className="text-gray-600 hover:text-gray-400 text-xs"
-                title="Rename"
-              >
-                ✏
-              </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-white truncate">{group.name}</p>
+                <button
+                  onClick={() => { setDraft(group.name); setEditing(true); }}
+                  className="text-gray-600 hover:text-gray-400 text-xs shrink-0"
+                  title="Rename"
+                >
+                  ✏
+                </button>
+              </div>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="truncate text-[11px] text-gray-600">{group.id}</code>
+                <button
+                  onClick={copyGroupId}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 shrink-0"
+                  title="Copy group ID"
+                >
+                  {copiedId ? "Copied" : "Copy ID"}
+                </button>
+              </div>
             </div>
           )}
           <div className="flex items-center gap-2 shrink-0">
@@ -737,7 +817,7 @@ function GroupCard({
                   key={dest.destinationId}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-black/20"
                 >
-                  <DestAvatar type={type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} />
+                  <DestAvatar type={type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} providerType={dest.providerType} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">{dest.name}</p>
                     <p className="text-xs text-gray-500">{TYPE_LABEL[type] ?? type}</p>

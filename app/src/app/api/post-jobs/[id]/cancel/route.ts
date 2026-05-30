@@ -1,5 +1,4 @@
-import { requeueJob } from "@/server/jobs/job-service";
-import { startJobRunner } from "@/server/jobs/job-runner";
+import { cancelJob } from "@/server/jobs/job-service";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +8,8 @@ export async function POST(
 ) {
   const { id } = await params;
   try {
-    await requeueJob(id);
-    startJobRunner();
-    return Response.json({ id, status: "Created" });
+    const job = await cancelJob(id);
+    return Response.json(job);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return Response.json({ error: msg }, { status: 400 });

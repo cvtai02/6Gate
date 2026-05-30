@@ -17,10 +17,10 @@ async function getStats() {
   return {
     accounts: allAccounts.length,
     providers: allProviders.length,
-    pending: allJobs.filter((j) => j.status === "queued").length,
-    running: allJobs.filter((j) => j.status === "running").length,
-    failed: allJobs.filter((j) => j.status === "failed").length,
-    completed: allJobs.filter((j) => j.status === "completed").length,
+    pending: allJobs.filter((j) => j.status === "Created").length,
+    running: allJobs.filter((j) => ["Initializing", "Uploading", "Finishing", "Processing", "Retrying"].includes(j.status)).length,
+    failed: allJobs.filter((j) => j.status === "Failed" || j.status === "ReconnectRequired").length,
+    completed: allJobs.filter((j) => j.status === "Published").length,
     recent: allJobs.slice(0, 8),
   };
 }

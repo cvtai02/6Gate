@@ -1,9 +1,17 @@
-import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
 import { groups, groupDestinations, publishDestinations, accounts, providers } from "@/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+
+function toSnakeCaseId(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
 
 export async function GET() {
   const db = getDb();
@@ -48,7 +56,17 @@ export async function POST(req: Request) {
   if (!name?.trim()) return Response.json({ error: "Name is required" }, { status: 400 });
 
   const db = getDb();
-  const id = `group_${nanoid(8)}`;
+  const id = toSnakeCaseId(name);
+  if (!id) return Response.json({ error: "Name must contain letters or numbers" }, { status: 400 });
+
+  const existing = await db.select().from(groups).where(eq(groups.id, id)).get();
+  if (existing) {
+    return Response.json(
+      { error: `A group with id "${id}" already exists. Choose a different name.` },
+      { status: 409 }
+    );
+  }
+
   const now = new Date().toISOString();
   await db.insert(groups).values({ id, name: name.trim(), createdAt: now });
   const row = await db.select().from(groups).where(eq(groups.id, id)).get();

@@ -23,6 +23,54 @@ export const DestinationType = {
 } as const;
 export type DestinationType = (typeof DestinationType)[keyof typeof DestinationType];
 
+export const PublishStatus = {
+  Created: "Created",
+  Initializing: "Initializing",
+  Uploading: "Uploading",
+  Finishing: "Finishing",
+  Processing: "Processing",
+  Published: "Published",
+  Failed: "Failed",
+  Retrying: "Retrying",
+  ReconnectRequired: "ReconnectRequired",
+  Cancelled: "Cancelled",
+} as const;
+export type PublishStatus = (typeof PublishStatus)[keyof typeof PublishStatus];
+
+/** Statuses where the worker should keep processing this job. */
+export const ACTIVE_STATUSES: PublishStatus[] = [
+  PublishStatus.Created,
+  PublishStatus.Initializing,
+  PublishStatus.Uploading,
+  PublishStatus.Finishing,
+  PublishStatus.Processing,
+  PublishStatus.Retrying,
+];
+
+/** Statuses the user/UI considers "done". */
+export const TERMINAL_STATUSES: PublishStatus[] = [
+  PublishStatus.Published,
+  PublishStatus.Failed,
+  PublishStatus.Cancelled,
+];
+
+export const ContentType = {
+  Video: "Video",
+  Reel: "Reel",
+} as const;
+export type ContentType = (typeof ContentType)[keyof typeof ContentType];
+
+/** How an error from a platform should be handled. */
+export const ErrorKind = {
+  /** Transient — bump attemptCount, schedule retry with backoff. */
+  Retryable: "Retryable",
+  /** Auth/permission failure — user must re-link the account. */
+  Reconnect: "Reconnect",
+  /** Permanent — do not retry. */
+  Permanent: "Permanent",
+} as const;
+export type ErrorKind = (typeof ErrorKind)[keyof typeof ErrorKind];
+
 export const Providers = {
   [ProviderType.meta]: {
     id: ProviderType.meta,

@@ -309,10 +309,97 @@ export class TikTokAdapter implements SocialProviderAdapter {
       throw new Error(`TikTok chunk upload failed (${chunkRes.status}): ${text}`);
     }
 
+    // The init/upload calls only get us a publish_id (e.g. "v_pub_file~v2-1.7644...") —
+    // the real post_id only appears after TikTok finishes processing AND moderation
+    // approves the post for public viewership. Poll until status is terminal.
+    const { postId, sentToInbox } = await this.#pollPublishStatus(publish_id, accessToken);
+
+    // When TikTok has no public post_id to give us — either because the video went to
+    // the creator's drafts/inbox (unaudited-app flow), or PUBLISH_COMPLETE landed but
+    // moderation hasn't surfaced a public URL yet — fall back to the publish_id as our
+    // provider handle and skip the URL. The upload itself succeeded.
+    if (sentToInbox || !postId) {
+      return {
+        providerPostId: postId ?? publish_id,
+        url: undefined,
+      };
+    }
+
     return {
-      providerPostId: publish_id,
-      url: `https://www.tiktok.com/@${account.username ?? "user"}/video/${publish_id}`,
+      providerPostId: postId,
+      url: `https://www.tiktok.com/@${account.username ?? "user"}/video/${postId}`,
     };
+  }
+
+  /**
+   * Poll TikTok /status/fetch until the upload reaches a terminal state.
+   *
+   * TikTok status values:
+   *   PROCESSING_UPLOAD / PROCESSING_DOWNLOAD — keep polling
+   *   PUBLISH_COMPLETE                         — done, post_id in publicaly_available_post_id[0]
+   *   SEND_TO_USER_INBOX                       — sent to creator's drafts (unaudited app)
+   *   FAILED                                   — give up, surface fail_reason
+   */
+  async #pollPublishStatus(
+    publishId: string,
+    accessToken: string
+  ): Promise<{ postId: string | null; sentToInbox: boolean }> {
+    const MAX_ATTEMPTS = 40;     // ~5 minutes at the cap
+    const startedAt = Date.now();
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      // 3s, 5s, 8s, 12s, then 15s cap. Total ≤ ~5min.
+      const waitMs = Math.min(15_000, 3_000 + attempt * 2_000);
+      await new Promise((r) => setTimeout(r, waitMs));
+
+      const res = await fetch(
+        "https://open.tiktokapis.com/v2/post/publish/status/fetch/",
+        {
+          method: "POST",
+          signal: AbortSignal.timeout(30_000),
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json; charset=UTF-8",
+          },
+          body: JSON.stringify({ publish_id: publishId }),
+        }
+      );
+
+      // Network/HTTP-level failures are retried by the outer loop until MAX_ATTEMPTS.
+      if (!res.ok) continue;
+
+      const body = await res.json().catch(() => ({}));
+      if (body.error?.code && body.error.code !== "ok") {
+        // API-layer error — keep polling unless it's clearly fatal.
+        continue;
+      }
+
+      const data = body.data ?? {};
+      const status: string = data.status ?? "";
+
+      if (status === "PUBLISH_COMPLETE") {
+        // TikTok ships this field with a typo in production; accept both spellings.
+        const ids: string[] =
+          data.publicaly_available_post_id ?? data.publicly_available_post_id ?? [];
+        return { postId: ids[0] ?? null, sentToInbox: false };
+      }
+
+      if (status === "SEND_TO_USER_INBOX") {
+        return { postId: null, sentToInbox: true };
+      }
+
+      if (status === "FAILED") {
+        const reason = data.fail_reason ?? "unknown";
+        throw new Error(`TikTok publish failed: ${reason}`);
+      }
+
+      // PROCESSING_UPLOAD / PROCESSING_DOWNLOAD / unknown → loop
+    }
+
+    const elapsedMin = ((Date.now() - startedAt) / 60_000).toFixed(1);
+    throw new Error(
+      `TikTok did not finish processing within ${elapsedMin}min. The video may still publish — check your TikTok account. publish_id=${publishId}`
+    );
   }
 
   async #ensureFreshToken(accountId: string) {

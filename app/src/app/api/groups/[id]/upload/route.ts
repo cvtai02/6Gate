@@ -7,6 +7,7 @@ import { groupDestinations, publishDestinations, accounts, providers } from "@/s
 import { eq } from "drizzle-orm";
 import { createJob } from "@/server/jobs/job-service";
 import { startJobRunner } from "@/server/jobs/job-runner";
+import { getDestinationIconUrl } from "@/lib/destination-icons";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,16 @@ export async function POST(
     return Response.json({ error: "Group has no destinations" }, { status: 400 });
   }
 
-  const jobs: { id: string; destinationId: string; destinationName: string; platform: string }[] = [];
+  const jobs: {
+    id: string;
+    destinationId: string;
+    destinationName: string;
+    destinationIcon: string | null;
+    platform: string;
+    jobDetailsLink: string;
+    jobEventsLink: string;
+    jobCancelLink: string;
+  }[] = [];
 
   for (const { destinationId } of links) {
     const dest = await db
@@ -90,7 +100,16 @@ export async function POST(
     if (!provider) continue;
 
     const job = await createJob({ accountId: account.id, destinationId, videoPath, title, caption, privacy });
-    jobs.push({ id: job.id, destinationId, destinationName: dest.name, platform: provider.type });
+    jobs.push({
+      id: job.id,
+      destinationId,
+      destinationName: dest.name,
+      destinationIcon: getDestinationIconUrl(req.url, dest.type, provider.type),
+      platform: provider.type,
+      jobDetailsLink: new URL(`/jobs/${job.id}`, req.url).toString(),
+      jobEventsLink: new URL(`/api/post-jobs/${job.id}/events`, req.url).toString(),
+      jobCancelLink: new URL(`/api/post-jobs/${job.id}/cancel`, req.url).toString(),
+    });
   }
 
   return Response.json({ groupId, jobs });

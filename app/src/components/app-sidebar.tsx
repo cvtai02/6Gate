@@ -8,6 +8,7 @@ const nav = [
   { href: "/providers", label: "Providers" },
   { href: "/videos", label: "Videos" },
   { href: "/groups", label: "Groups" },
+  { href: "/usecases", label: "Use Cases" },
   { href: "/jobs", label: "Jobs" },
   { href: "/api-docs", label: "API Docs" },
   { href: "/settings", label: "Settings" },

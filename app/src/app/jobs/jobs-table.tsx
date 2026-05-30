@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { JobStatusBadge } from "@/components/job-status-badge";
+import { getDestinationIconPath } from "@/lib/destination-icons";
 
 const DEST_TYPE_LABEL: Record<string, string> = {
   youtube_channel: "YouTube Channel",
@@ -53,7 +54,9 @@ export function JobsTable({ jobs }: { jobs: Job[] }) {
           </tr>
         </thead>
         <tbody>
-          {jobs.map((job) => (
+          {jobs.map((job) => {
+            const destinationIcon = getDestinationIconPath(job.destinationType, job.platform);
+            return (
             <tr
               key={job.id}
               className="border-b border-[var(--border)] last:border-0 hover:bg-white/[0.03] cursor-pointer"
@@ -67,6 +70,10 @@ export function JobsTable({ jobs }: { jobs: Job[] }) {
                       alt=""
                       className="w-7 h-7 rounded-full object-cover shrink-0 bg-gray-700"
                     />
+                  ) : destinationIcon ? (
+                    <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 p-1.5">
+                      <img src={destinationIcon} alt="" className="w-full h-full object-contain" />
+                    </div>
                   ) : (
                     <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center shrink-0 text-[10px] font-semibold text-gray-400 uppercase">
                       {(job.destinationName ?? job.platform).slice(0, 2)}
@@ -91,7 +98,7 @@ export function JobsTable({ jobs }: { jobs: Job[] }) {
                 <div className="max-w-[240px] truncate text-gray-400 text-xs">{job.caption ?? "—"}</div>
               </td>
               <td className="px-5 py-3">
-                {job.status === "completed" && job.providerPostUrl ? (
+                {job.status === "Published" && job.providerPostUrl ? (
                   <a
                     href={job.providerPostUrl}
                     target="_blank"
@@ -113,7 +120,8 @@ export function JobsTable({ jobs }: { jobs: Job[] }) {
                 {timeAgo(job.updatedAt)}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
