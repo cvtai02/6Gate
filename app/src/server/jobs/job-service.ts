@@ -17,6 +17,8 @@ export const CreateJobSchema = z.object({
   scheduledAt: z.string().optional(),
   /** Video (default) or Reel. Reel is currently only meaningful for Meta/Facebook Page. */
   contentType: z.enum(["Video", "Reel"]).optional(),
+  groupId: z.string().optional(),
+  uploadBatchId: z.string().optional(),
   /** Idempotency key — if a job with this key already exists, it is returned instead of inserting a duplicate. */
   idempotencyKey: z.string().optional(),
   /** Max retry attempts before giving up. Default = 6 (≈ 5min cap). */
@@ -72,6 +74,8 @@ export async function createJob(input: CreateJobInput) {
     platform: provider.type,
     contentType: input.contentType ?? ContentType.Video,
     status: PublishStatus.Created,
+    groupId: input.groupId ?? null,
+    uploadBatchId: input.uploadBatchId ?? null,
     videoPath: input.videoPath,
     title: input.title ?? null,
     caption: input.caption ?? null,

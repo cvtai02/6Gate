@@ -1,8 +1,19 @@
 # dependencies
 app/node_modules/
+api-clients/node_modules/
+ui/node_modules/
 
 # Next.js build output
 app/.next/
+ui/.next/
+ui/out/
+
+# build output
+app/dist/
+api-clients/dist/
+*.tgz
+!api-clients/sixgate-api-client-0.1.0.tgz
+*.tsbuildinfo
 
 # local database
 app/data/

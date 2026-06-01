@@ -41,10 +41,12 @@ export async function getProviderRecord(providerId: string) {
     .where(eq(providers.id, providerId))
     .get();
   if (!provider) throw new Error(`Provider ${providerId} not found`);
-  if (!provider.clientId)
+  if (provider.type !== ProviderType.zernio && !provider.clientId)
     throw new Error(`Provider "${provider.name}" has no Client ID configured`);
-  if (!provider.clientSecret)
-    throw new Error(`Provider "${provider.name}" has no Client Secret configured`);
+  if (provider.type !== ProviderType.zernio && !provider.clientSecret)
+    throw new Error(provider.type === ProviderType.zernio
+      ? `Provider "${provider.name}" has no API key configured`
+      : `Provider "${provider.name}" has no Client Secret configured`);
   return provider;
 }
 

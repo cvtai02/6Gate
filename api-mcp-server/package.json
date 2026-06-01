@@ -1,0 +1,11 @@
+{
+  "name": "6gate-api-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke:health": "node src/smoke.mjs health",
+    "smoke:seed": "node src/smoke.mjs seed",
+    "smoke:scheduled": "node src/smoke.mjs scheduled"
+  }
+}

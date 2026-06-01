@@ -31,11 +31,13 @@ async function processNextJob() {
   if (state.running) return;
 
   const db = getDb();
-  const candidate = await db
+  const candidates = await db
     .select()
     .from(postJobs)
     .where(eq(postJobs.status, PublishStatus.Created))
-    .get();
+    .all();
+  const nowMs = Date.now();
+  const candidate = candidates.find((job) => !job.scheduledAt || new Date(job.scheduledAt).getTime() <= nowMs);
 
   if (!candidate) return;
 

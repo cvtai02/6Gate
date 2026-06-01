@@ -1,5 +1,11 @@
 import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const providers = sqliteTable("providers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -37,6 +43,8 @@ export const postJobs = sqliteTable("post_jobs", {
   contentType: text("content_type"),
   /** PublishStatus enum (see lib/enums.ts). */
   status: text("status").notNull(),
+  groupId: text("group_id"),
+  uploadBatchId: text("upload_batch_id"),
   videoPath: text("video_path").notNull(),
   title: text("title"),
   caption: text("caption"),

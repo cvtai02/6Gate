@@ -1,6 +1,14 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function runMigrations(db: any) {
   db.run(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -60,6 +68,8 @@ export function runMigrations(db: any) {
       destination_id TEXT,
       platform TEXT NOT NULL,
       status TEXT NOT NULL,
+      group_id TEXT,
+      upload_batch_id TEXT,
       video_path TEXT NOT NULL,
       title TEXT,
       caption TEXT,
@@ -143,6 +153,8 @@ export function runMigrations(db: any) {
   // Resilient-job columns on post_jobs (idempotent — wrap each ALTER in try/catch)
   const postJobsColumns: [string, string][] = [
     ["content_type", "TEXT"],
+    ["group_id", "TEXT"],
+    ["upload_batch_id", "TEXT"],
     ["upload_session_id", "TEXT"],
     ["upload_session_url", "TEXT"],
     ["upload_url", "TEXT"],
