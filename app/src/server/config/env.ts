@@ -10,4 +10,5 @@ export const env = {
   uploadsDir: path.join(dataDir, "uploads", "temp"),
   logsDir: path.join(dataDir, "logs"),
   configDir: path.join(dataDir, "config"),
+  settingsPath: path.join(dataDir, "config", "runtime-settings.json"),
 };

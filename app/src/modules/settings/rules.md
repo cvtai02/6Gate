@@ -1,5 +1,6 @@
 # Settings Rules
 
-- Settings are stored in the database.
-- Startup defaults may bootstrap missing settings, but runtime reads should use the table.
-
+- Persist runtime settings to the JSON file configured by `env.settingsPath`.
+- Keep the JSON settings file ignored by git.
+- Controllers must call settings use cases only.
+- Add settings DTOs under `dtos/` when request or response contracts change.

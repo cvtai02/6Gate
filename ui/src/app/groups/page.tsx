@@ -45,6 +45,7 @@ const TYPE_COLORS: Record<string, string> = {
   tiktok_account: "bg-gray-800",
   instagram_account: "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-400",
   threads_profile: "bg-black",
+  TelegramChat: "bg-sky-500",
 };
 
 const TYPE_ABBR: Record<string, string> = {
@@ -53,6 +54,7 @@ const TYPE_ABBR: Record<string, string> = {
   tiktok_account: "TK",
   instagram_account: "IG",
   threads_profile: "TH",
+  TelegramChat: "TG",
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -61,9 +63,10 @@ const TYPE_LABEL: Record<string, string> = {
   tiktok_account: "TikTok",
   instagram_account: "Instagram",
   threads_profile: "Threads",
+  TelegramChat: "Telegram",
 };
 
-const TYPE_ORDER = ["youtube_channel", "facebook_page", "instagram_account", "threads_profile", "tiktok_account"];
+const TYPE_ORDER = ["youtube_channel", "facebook_page", "instagram_account", "threads_profile", "tiktok_account", "TelegramChat"];
 
 function DestBadge({ type, providerType }: { type: string; providerType?: string | null }) {
   const iconPath = getDestinationIconPath(type, providerType);

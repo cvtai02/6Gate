@@ -9,6 +9,7 @@ const DESTINATION_TYPE: Record<string, DestinationType> = {
   [ProviderType.youtube]: DestinationType.youtube_channel,
   [ProviderType.meta]: DestinationType.facebook_page,
   [ProviderType.tiktok]: DestinationType.tiktok_account,
+  [ProviderType.telegram]: DestinationType.TelegramChat,
   instagram: DestinationType.instagram_account,
 };
 
@@ -41,9 +42,9 @@ export async function getProviderRecord(providerId: string) {
     .where(eq(providers.id, providerId))
     .get();
   if (!provider) throw new Error(`Provider ${providerId} not found`);
-  if (provider.type !== ProviderType.zernio && !provider.clientId)
+  if (provider.type !== ProviderType.zernio && provider.type !== ProviderType.telegram && !provider.clientId)
     throw new Error(`Provider "${provider.name}" has no Client ID configured`);
-  if (provider.type !== ProviderType.zernio && !provider.clientSecret)
+  if (provider.type !== ProviderType.zernio && provider.type !== ProviderType.telegram && !provider.clientSecret)
     throw new Error(provider.type === ProviderType.zernio
       ? `Provider "${provider.name}" has no API key configured`
       : `Provider "${provider.name}" has no Client Secret configured`);

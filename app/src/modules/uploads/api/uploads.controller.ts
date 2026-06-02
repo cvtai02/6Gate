@@ -5,11 +5,11 @@ import { tmpdir } from "os";
 import { extname } from "path";
 import { nanoid } from "nanoid";
 import { diskStorage } from "multer";
-import { UploadsUseCases } from "../use-cases/uploads.use-cases";
+import { SaveTempFileUseCase } from "../usecases/save-temp-file.usecase";
 
 @Controller("videos")
 export class UploadsController {
-  constructor(private readonly uploads: UploadsUseCases) {}
+  constructor(private readonly saveTempFile: SaveTempFileUseCase) {}
 
   @Post("upload")
   @UseInterceptors(
@@ -29,6 +29,6 @@ export class UploadsController {
       res.status(400);
       return { error: "No file provided" };
     }
-    return this.uploads.saveTempFile(file);
+    return this.saveTempFile.execute(file);
   }
 }

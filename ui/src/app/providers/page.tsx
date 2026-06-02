@@ -87,6 +87,12 @@ function ZernioIcon({ className }: { className?: string }) {
   );
 }
 
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <img className={className} src="/icons/telegram.svg" alt="" aria-hidden="true" />
+  );
+}
+
 const PROVIDER_META: Record<string, ProviderMeta> = {
   youtube: {
     label: "YouTube",
@@ -140,6 +146,19 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     ],
     Icon: ZernioIcon,
   },
+  telegram: {
+    label: "Telegram",
+
+    defaultScopes: "",
+    devConsole: "https://core.telegram.org/bots",
+    devConsoleLabel: "Telegram Bot API",
+    notes: [
+      "Create a bot with BotFather and copy the bot token.",
+      "Add the bot to the target group or channel with posting permission.",
+      "Add each chat as an account using its chat ID or public @username.",
+    ],
+    Icon: TelegramIcon,
+  },
 };
 
 const ICON_COLORS: Record<string, string> = {
@@ -147,6 +166,7 @@ const ICON_COLORS: Record<string, string> = {
   tiktok: "bg-gray-900",
   meta: "bg-white/10",
   zernio: "bg-transparent",
+  telegram: "bg-sky-500",
 };
 
 const REDIRECT_URI = "http://localhost:20129/api/accounts/oauth/callback";
@@ -475,10 +495,10 @@ export default function ProvidersPage() {
         </div>
       </div>
 
-      {/* OAuth Providers section */}
+      {/* Providers section */}
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          OAuth Providers
+          Providers
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {oauthTypes.map((type) => (

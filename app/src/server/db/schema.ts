@@ -118,7 +118,7 @@ export const publishDestinations = sqliteTable("publish_destinations", {
   id: text("id").primaryKey(),
   socialAccountId: text("social_account_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // youtube_channel | facebook_page | tiktok_account
+  type: text("type").notNull(), // youtube_channel | facebook_page | tiktok_account | TelegramChat
   externalId: text("external_id"),
   /** Page-level access token (Meta only). Stored here so one user account can hold many pages. */
   accessToken: text("access_token"),
@@ -132,4 +132,27 @@ export const groupDestinations = sqliteTable("combo_destinations", {
   groupId: text("combo_id").notNull(),
   destinationId: text("destination_id").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+export const groupUploadQueue = sqliteTable("group_upload_queue", {
+  id: text("id").primaryKey(),
+  groupId: text("group_id").notNull(),
+  videoPath: text("video_path").notNull(),
+  title: text("title"),
+  caption: text("caption"),
+  privacy: text("privacy"),
+  scheduledAt: text("scheduled_at"),
+  status: text("status").notNull(),
+  uploadBatchId: text("upload_batch_id"),
+  errorMessage: text("error_message"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const groupUploadSettings = sqliteTable("group_upload_settings", {
+  groupId: text("group_id").primaryKey(),
+  uploadTimeInDay: text("upload_time_in_day").notNull(),
+  lastTriggeredDate: text("last_triggered_date"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });

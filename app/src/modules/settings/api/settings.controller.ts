@@ -1,18 +1,22 @@
 import { Body, Controller, Get, Param, Patch } from "@nestjs/common";
-import { SettingsUseCases } from "../use-cases/settings.use-cases";
+import { UpdateSettingUseCase } from "../usecases/commands/update-setting.usecase";
+import { ListSettingsUseCase } from "../usecases/queries/list-settings.usecase";
+import type { UpdateSettingDto } from "../dtos/update-setting.dto";
 
 @Controller("settings")
 export class SettingsController {
-  constructor(private readonly settings: SettingsUseCases) {}
+  constructor(
+    private readonly listSettings: ListSettingsUseCase,
+    private readonly updateSetting: UpdateSettingUseCase,
+  ) {}
 
   @Get()
   list() {
-    return this.settings.list();
+    return this.listSettings.execute();
   }
 
   @Patch(":key")
-  update(@Param("key") key: string, @Body() body: { value?: string }) {
-    return this.settings.update(key, String(body.value ?? ""));
+  update(@Param("key") key: string, @Body() body: UpdateSettingDto) {
+    return this.updateSetting.execute(key, String(body.value ?? ""));
   }
 }
-

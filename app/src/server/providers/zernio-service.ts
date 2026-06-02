@@ -23,13 +23,14 @@ type ZernioAccount = {
   profilePictureUrl?: string | null;
 };
 
-export type ZernioPlatform = "tiktok" | "facebook" | "instagram" | "youtube";
+export type ZernioPlatform = "tiktok" | "facebook" | "instagram" | "youtube" | "telegram";
 
 const PLATFORM_TO_DESTINATION: Record<ZernioPlatform, DestinationType> = {
   tiktok: DestinationType.tiktok_account,
   facebook: DestinationType.facebook_page,
   instagram: DestinationType.instagram_account,
   youtube: DestinationType.youtube_channel,
+  telegram: DestinationType.TelegramChat,
 };
 
 export function zernioPlatformForDestination(type?: string | null): ZernioPlatform | null {
@@ -42,6 +43,8 @@ export function zernioPlatformForDestination(type?: string | null): ZernioPlatfo
       return "instagram";
     case DestinationType.youtube_channel:
       return "youtube";
+    case DestinationType.TelegramChat:
+      return "telegram";
     default:
       return null;
   }

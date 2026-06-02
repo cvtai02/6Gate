@@ -150,6 +150,37 @@ export function runMigrations(db: any) {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS group_upload_queue (
+      id TEXT PRIMARY KEY,
+      group_id TEXT NOT NULL,
+      video_path TEXT NOT NULL,
+      title TEXT,
+      caption TEXT,
+      privacy TEXT,
+      scheduled_at TEXT,
+      status TEXT NOT NULL,
+      upload_batch_id TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (group_id) REFERENCES combos(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS group_upload_settings (
+      group_id TEXT PRIMARY KEY,
+      upload_time_in_day TEXT NOT NULL,
+      last_triggered_date TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (group_id) REFERENCES combos(id)
+    )
+  `);
+
+  try { db.run(`CREATE INDEX IF NOT EXISTS idx_group_upload_queue_pick ON group_upload_queue(group_id, status, created_at)`); } catch {}
+
   // Resilient-job columns on post_jobs (idempotent — wrap each ALTER in try/catch)
   const postJobsColumns: [string, string][] = [
     ["content_type", "TEXT"],

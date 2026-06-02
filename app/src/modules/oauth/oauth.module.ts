@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
 import { OauthController } from "./api/oauth.controller";
-import { OauthUseCases } from "./use-cases/oauth.use-cases";
+import { HandleOauthCallbackUseCase } from "./usecases/commands/handle-oauth-callback.usecase";
+import { StartOauthUseCase } from "./usecases/commands/start-oauth.usecase";
 
 @Module({
   controllers: [OauthController],
-  providers: [OauthUseCases],
+  providers: [HandleOauthCallbackUseCase, StartOauthUseCase],
 })
 export class OauthModule {}

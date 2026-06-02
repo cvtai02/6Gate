@@ -24,6 +24,8 @@ app/data/
 app/.env
 app/.env.local
 app/.env*.local
+app/config/*.json
+runtime-settings.json
 
 # OS
 .DS_Store

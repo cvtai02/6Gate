@@ -1,33 +1,50 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { JobsUseCases } from "../use-cases/jobs.use-cases";
-import { getJobLogs } from "@/server/jobs/log-service";
-import { getJob } from "@/server/jobs/job-service";
+import { CancelJobUseCase } from "../usecases/commands/cancel-job.usecase";
+import { CreateJobUseCase } from "../usecases/commands/create-job.usecase";
+import { DeleteJobUseCase } from "../usecases/commands/delete-job.usecase";
+import { RetryJobUseCase } from "../usecases/commands/retry-job.usecase";
+import { GetJobDetailUseCase } from "../usecases/queries/get-job-detail.usecase";
+import { GetJobLogsUseCase } from "../usecases/queries/get-job-logs.usecase";
+import { GetJobUseCase } from "../usecases/queries/get-job.usecase";
+import { ListJobsTableUseCase } from "../usecases/queries/list-jobs-table.usecase";
+import { ListJobsUseCase } from "../usecases/queries/list-jobs.usecase";
+import type { CreateJobDto } from "../dtos/create-job.dto";
 
 const TERMINAL_STATUSES = ["Published", "Failed", "Cancelled"] as const;
 
 @Controller("post-jobs")
 export class JobsController {
-  constructor(private readonly jobs: JobsUseCases) {}
+  constructor(
+    private readonly listJobs: ListJobsUseCase,
+    private readonly listJobsTable: ListJobsTableUseCase,
+    private readonly createJob: CreateJobUseCase,
+    private readonly getJobDetail: GetJobDetailUseCase,
+    private readonly getJob: GetJobUseCase,
+    private readonly getJobLogs: GetJobLogsUseCase,
+    private readonly deleteJob: DeleteJobUseCase,
+    private readonly cancelJob: CancelJobUseCase,
+    private readonly retryJob: RetryJobUseCase,
+  ) {}
 
   @Get()
   list() {
-    return this.jobs.listRaw();
+    return this.listJobs.execute();
   }
 
   @Get("table")
   table() {
-    return this.jobs.listForTable();
+    return this.listJobsTable.execute();
   }
 
   @Post()
-  create(@Body() body: unknown) {
-    return this.jobs.create(body);
+  create(@Body() body: CreateJobDto) {
+    return this.createJob.execute(body);
   }
 
   @Get(":id")
   async get(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
-    const job = await this.jobs.get(id);
+    const job = await this.getJobDetail.execute(id);
     if (!job) {
       res.status(404);
       return { error: "Not found" };
@@ -38,22 +55,22 @@ export class JobsController {
   @Delete(":id")
   @HttpCode(204)
   async remove(@Param("id") id: string) {
-    await this.jobs.remove(id);
+    await this.deleteJob.execute(id);
   }
 
   @Post(":id/cancel")
   cancel(@Param("id") id: string) {
-    return this.jobs.cancel(id);
+    return this.cancelJob.execute(id);
   }
 
   @Post(":id/retry")
   retry(@Param("id") id: string) {
-    return this.jobs.retry(id);
+    return this.retryJob.execute(id);
   }
 
   @Get(":id/events")
   async events(@Param("id") id: string, @Res() res: Response) {
-    const job = await getJob(id);
+    const job = await this.getJob.execute(id);
     if (!job) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -82,7 +99,7 @@ export class JobsController {
       res.end();
     };
 
-    for (const log of await getJobLogs(id)) {
+    for (const log of await this.getJobLogs.execute(id)) {
       seenLogIds.add(log.id);
       send("log", { level: log.level, message: log.message, createdAt: log.createdAt });
     }
@@ -94,7 +111,7 @@ export class JobsController {
     });
 
     const poll = setInterval(async () => {
-      const [logs, currentJob] = await Promise.all([getJobLogs(id), getJob(id)]);
+      const [logs, currentJob] = await Promise.all([this.getJobLogs.execute(id), this.getJob.execute(id)]);
       for (const log of logs) {
         if (!seenLogIds.has(log.id)) {
           seenLogIds.add(log.id);
@@ -125,4 +142,3 @@ export class JobsController {
     res.on("close", close);
   }
 }
-

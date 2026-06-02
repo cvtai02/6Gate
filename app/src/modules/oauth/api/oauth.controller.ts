@@ -1,20 +1,25 @@
 import { Body, Controller, Get, Post, Query, Redirect, Res } from "@nestjs/common";
 import type { Response } from "express";
-import { OauthUseCases } from "../use-cases/oauth.use-cases";
+import { HandleOauthCallbackUseCase } from "../usecases/commands/handle-oauth-callback.usecase";
+import { StartOauthUseCase } from "../usecases/commands/start-oauth.usecase";
+import type { StartOauthDto } from "../dtos/start-oauth.dto";
 
 @Controller("accounts/oauth")
 export class OauthController {
-  constructor(private readonly oauth: OauthUseCases) {}
+  constructor(
+    private readonly startOauth: StartOauthUseCase,
+    private readonly handleCallback: HandleOauthCallbackUseCase,
+  ) {}
 
   @Post("start")
-  async start(@Body() body: { providerId?: string }, @Res({ passthrough: true }) res: Response) {
+  async start(@Body() body: StartOauthDto, @Res({ passthrough: true }) res: Response) {
     if (!body.providerId) {
       res.status(400);
       return { error: "providerId is required" };
     }
 
     try {
-      const url = await this.oauth.start(body.providerId);
+      const url = await this.startOauth.execute(body.providerId);
       return { url };
     } catch (err) {
       res.status(400);
@@ -38,7 +43,7 @@ export class OauthController {
       return { url: "/providers?error=Missing%20code%20or%20provider_id", statusCode: 302 };
     }
 
-    const url = await this.oauth.callback({ providerId, code, state });
+    const url = await this.handleCallback.execute({ providerId, code, state });
     return { url, statusCode: 302 };
   }
 }

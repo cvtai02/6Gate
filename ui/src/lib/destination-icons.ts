@@ -7,6 +7,8 @@ const DESTINATION_ICON_PATHS: Record<string, string> = {
   instagram_account: "/icons/instagram.svg",
   tiktok: "/icons/tiktok.svg",
   tiktok_account: "/icons/tiktok.svg",
+  telegram: "/icons/telegram.svg",
+  TelegramChat: "/icons/telegram.svg",
 };
 
 export function getDestinationIconPath(type?: string | null, providerType?: string | null) {

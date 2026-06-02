@@ -5,12 +5,18 @@ export type ApiClientOptions = {
 
 import type {
   AccountDto,
+  AddTelegramChatDto,
+  AddTelegramAccountDto,
+  EnqueueGroupUploadDto,
   GroupDto,
   GroupHistoryDto,
+  GroupUploadQueueItemDto,
+  GroupUploadSettingsDto,
   JobDto,
   ProviderDto,
   PublishDestinationDto,
   RuntimeSettingDto,
+  UpdateGroupUploadSettingsDto,
 } from "./types";
 
 export class SixGateApiClient {
@@ -88,6 +94,14 @@ export class SixGateApiClient {
     return this.post<AccountDto>("/accounts/zernio/add", body);
   }
 
+  addTelegramAccount(body: AddTelegramAccountDto) {
+    return this.post<AccountDto>("/accounts/telegram/add", body);
+  }
+
+  addTelegramChat(accountId: string, body: AddTelegramChatDto) {
+    return this.post<PublishDestinationDto>(`/accounts/${encodeURIComponent(accountId)}/telegram/chats`, body);
+  }
+
   syncZernioAccounts(body?: unknown) {
     return this.post<unknown>("/accounts/zernio/sync", body);
   }
@@ -110,6 +124,26 @@ export class SixGateApiClient {
 
   getGroupHistory(id: string) {
     return this.get<GroupHistoryDto>(`/groups/${encodeURIComponent(id)}/history`);
+  }
+
+  listGroupUploadQueue(id: string) {
+    return this.get<GroupUploadQueueItemDto[]>(`/groups/${encodeURIComponent(id)}/queue`);
+  }
+
+  enqueueGroupUpload(id: string, body: EnqueueGroupUploadDto) {
+    return this.post<GroupUploadQueueItemDto>(`/groups/${encodeURIComponent(id)}/queue`, body);
+  }
+
+  removeGroupUploadQueueItem(id: string, itemId: string) {
+    return this.delete<void>(`/groups/${encodeURIComponent(id)}/queue/${encodeURIComponent(itemId)}`);
+  }
+
+  getGroupUploadSettings(id: string) {
+    return this.get<GroupUploadSettingsDto>(`/groups/${encodeURIComponent(id)}/queue-settings`);
+  }
+
+  updateGroupUploadSettings(id: string, body: UpdateGroupUploadSettingsDto) {
+    return this.patch<GroupUploadSettingsDto>(`/groups/${encodeURIComponent(id)}/queue-settings`, body);
   }
 
   uploadGroupByPath(id: string, body: unknown) {

@@ -10,6 +10,7 @@ const DEST_TYPE_LABEL: Record<string, string> = {
   tiktok_account: "TikTok Account",
   instagram_account: "Instagram Account",
   threads_profile: "Threads Profile",
+  TelegramChat: "Telegram Chat",
 };
 
 function timeAgo(dateStr: string): string {

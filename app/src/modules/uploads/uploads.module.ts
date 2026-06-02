@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { UploadsController } from "./api/uploads.controller";
-import { UploadsUseCases } from "./use-cases/uploads.use-cases";
+import { SaveTempFileUseCase } from "./usecases/save-temp-file.usecase";
 
 @Module({
   controllers: [UploadsController],
-  providers: [UploadsUseCases],
+  providers: [SaveTempFileUseCase],
 })
 export class UploadsModule {}

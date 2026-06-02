@@ -22,6 +22,19 @@ export type AccountDto = {
   providerType?: string | null;
 };
 
+export type AddTelegramAccountDto = {
+  providerId?: string;
+  name?: string;
+  botToken: string;
+  chatId?: string;
+  chatName?: string;
+};
+
+export type AddTelegramChatDto = {
+  chatId: string;
+  chatName?: string;
+};
+
 export type PublishDestinationDto = {
   id: string;
   socialAccountId: string;
@@ -104,6 +117,41 @@ export type GroupHistoryBatchDto = {
 export type GroupHistoryDto = {
   groupId: string;
   batches: GroupHistoryBatchDto[];
+};
+
+export type EnqueueGroupUploadDto = {
+  videoPath?: string;
+  title?: string;
+  caption?: string;
+  privacy?: string;
+  scheduledAt?: string;
+};
+
+export type GroupUploadQueueItemDto = {
+  id: string;
+  groupId: string;
+  videoPath: string;
+  title: string | null;
+  caption: string | null;
+  privacy: string | null;
+  scheduledAt: string | null;
+  status: string;
+  uploadBatchId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GroupUploadSettingsDto = {
+  groupId: string;
+  uploadTimeInDay: string;
+  lastTriggeredDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateGroupUploadSettingsDto = {
+  uploadTimeInDay?: string;
 };
 
 export type RuntimeSettingDto = {

@@ -12,6 +12,7 @@ export const ProviderType = {
   youtube: "youtube",
   tiktok: "tiktok",
   zernio: "zernio",
+  telegram: "telegram",
 } as const;
 export type ProviderType = (typeof ProviderType)[keyof typeof ProviderType];
 
@@ -21,6 +22,7 @@ export const DestinationType = {
   tiktok_account: "tiktok_account",
   instagram_account: "instagram_account",
   threads_profile: "threads_profile",
+  TelegramChat: "TelegramChat",
 } as const;
 export type DestinationType = (typeof DestinationType)[keyof typeof DestinationType];
 
@@ -96,6 +98,12 @@ export const Providers = {
       DestinationType.facebook_page,
       DestinationType.instagram_account,
       DestinationType.youtube_channel,
+      DestinationType.TelegramChat,
     ],
+  },
+  [ProviderType.telegram]: {
+    id: ProviderType.telegram,
+    name: "Telegram",
+    destinations: [DestinationType.TelegramChat],
   },
 } as const;
