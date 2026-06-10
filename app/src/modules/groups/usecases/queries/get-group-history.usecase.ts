@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, postJobs, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, postJobs, providers, destinations } from "@/server/db/schema";
 import { getDestinationIconUrl } from "@/lib/destination-icons";
 
 @Injectable()
@@ -21,15 +21,15 @@ export class GetGroupHistoryUseCase {
         errorMessage: postJobs.errorMessage,
         createdAt: postJobs.createdAt,
         updatedAt: postJobs.updatedAt,
-        destinationId: publishDestinations.id,
-        destinationName: publishDestinations.name,
-        destinationType: publishDestinations.type,
-        destinationAvatar: publishDestinations.avatarUrl,
+        destinationId: destinations.id,
+        destinationName: destinations.name,
+        destinationType: destinations.type,
+        destinationAvatar: destinations.avatarUrl,
         accountAvatar: accounts.avatarUrl,
         providerType: providers.type,
       })
       .from(postJobs)
-      .leftJoin(publishDestinations, eq(postJobs.destinationId, publishDestinations.id))
+      .leftJoin(destinations, eq(postJobs.destinationId, destinations.id))
       .leftJoin(accounts, eq(postJobs.accountId, accounts.id))
       .leftJoin(providers, eq(accounts.providerId, providers.id))
       .where(eq(postJobs.groupId, groupId))

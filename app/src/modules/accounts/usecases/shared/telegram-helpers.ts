@@ -2,7 +2,7 @@ import { NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
 import { DestinationType, ProviderType } from "@/lib/enums";
 
 type TelegramApiResponse<T> = {
@@ -95,27 +95,27 @@ export async function upsertTelegramChatDestination(accountId: string, chat: Tel
   const name = preferredName?.trim() || chat.title || personName || (chat.username ? `@${chat.username}` : "") || externalId;
   const existingRows = await db
     .select()
-    .from(publishDestinations)
-    .where(eq(publishDestinations.socialAccountId, accountId))
+    .from(destinations)
+    .where(eq(destinations.socialAccountId, accountId))
     ;
   const matches = existingRows.filter((row) => row.externalId === externalId || row.externalId === chatId || (chat.username && row.externalId === `@${chat.username}`));
   const existing = matches[0];
 
   if (existing) {
     await db
-      .update(publishDestinations)
+      .update(destinations)
       .set({
         name,
         type: DestinationType.TelegramChat,
         externalId,
       })
-      .where(eq(publishDestinations.id, existing.id));
+      .where(eq(destinations.id, existing.id));
     for (const duplicate of matches.slice(1)) {
       await db
         .update(groupDestinations)
         .set({ destinationId: existing.id })
         .where(eq(groupDestinations.destinationId, duplicate.id));
-      await db.delete(publishDestinations).where(eq(publishDestinations.id, duplicate.id));
+      await db.delete(destinations).where(eq(destinations.id, duplicate.id));
     }
     return { created: false, destination: { ...existing, name, type: DestinationType.TelegramChat, externalId } };
   }
@@ -130,6 +130,6 @@ export async function upsertTelegramChatDestination(accountId: string, chat: Tel
     avatarUrl: null,
     createdAt: new Date().toISOString(),
   };
-  await db.insert(publishDestinations).values(destination);
+  await db.insert(destinations).values(destination);
   return { created: true, destination };
 }

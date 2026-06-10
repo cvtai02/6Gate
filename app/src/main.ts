@@ -3,7 +3,8 @@ import { randomBytes } from "crypto";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-// Load .env bootstrap settings (SYSTEM_SECRET, etc.) without overriding shell env vars.
+// Load .env bootstrap settings (SYSTEM_SECRET, ENCRYPTION_KEY, ...) without
+// overriding shell env vars.
 const envPath = join(process.cwd(), ".env");
 let envLines: string[] = [];
 try {
@@ -14,19 +15,24 @@ try {
   }
 } catch {}
 
-// Auto-generate SYSTEM_SECRET on first boot (replaces the "changeme" default).
-if (!process.env.SYSTEM_SECRET || process.env.SYSTEM_SECRET === "changeme") {
+// Auto-generate secrets on first boot (replaces the "changeme" default).
+//   SYSTEM_SECRET  — auth: login + JWT signing + x-system-secret header
+//   ENCRYPTION_KEY — AES-256-GCM key for sensitive values stored in the DB
+// A regenerated ENCRYPTION_KEY can't decrypt existing data, so this only ever
+// fills in a missing/placeholder key on a fresh install — it never rotates one.
+for (const name of ["SYSTEM_SECRET", "ENCRYPTION_KEY"]) {
+  if (process.env[name] && process.env[name] !== "changeme") continue;
   const secret = randomBytes(32).toString("hex");
-  process.env.SYSTEM_SECRET = secret;
-  const updated = envLines.map((l) =>
-    /^\s*SYSTEM_SECRET=/.test(l) ? `SYSTEM_SECRET=${secret}` : l,
-  );
-  if (!updated.some((l) => /^\s*SYSTEM_SECRET=/.test(l))) updated.push(`SYSTEM_SECRET=${secret}`);
+  process.env[name] = secret;
+  const re = new RegExp(`^\\s*${name}=`);
+  let found = false;
+  envLines = envLines.map((l) => (re.test(l) ? ((found = true), `${name}=${secret}`) : l));
+  if (!found) envLines.push(`${name}=${secret}`);
   try {
-    writeFileSync(envPath, updated.join("\n"), "utf8");
-    console.log(`[6Gate] Generated SYSTEM_SECRET and saved to .env`);
+    writeFileSync(envPath, envLines.join("\n"), "utf8");
+    console.log(`[6Gate] Generated ${name} and saved to .env`);
   } catch (e) {
-    console.warn("[6Gate] Could not write generated secret to .env:", e);
+    console.warn(`[6Gate] Could not write generated ${name} to .env:`, e);
   }
 }
 

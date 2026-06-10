@@ -12,7 +12,7 @@ const DEFAULT_STORAGE_API_URL = "http://localhost:20131";
 async function getStorageProvider() {
   const row = await getDb().select().from(router7).limit(1).then((r) => r[0]);
   if (!row) throw new Error("No storage provider configured.");
-  const accessToken = row.accessToken ? decryptValue(row.accessToken, env.systemSecret) : "";
+  const accessToken = row.accessToken ? decryptValue(row.accessToken, env.encryptionKey) : "";
   const baseUrl = row.baseUrl?.trim() || DEFAULT_STORAGE_API_URL;
   return { accessToken, baseUrl };
 }

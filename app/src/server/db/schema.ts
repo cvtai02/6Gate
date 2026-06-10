@@ -113,14 +113,7 @@ export const groups = pgTable("combos", {
   createdAt: text("created_at").notNull(),
 });
 
-export const comboAccounts = pgTable("combo_accounts", {
-  id: text("id").primaryKey(),
-  comboId: text("combo_id").notNull(),
-  accountId: text("account_id").notNull(),
-  createdAt: text("created_at").notNull(),
-});
-
-export const publishDestinations = pgTable("publish_destinations", {
+export const destinations = pgTable("destinations", {
   id: text("id").primaryKey(),
   socialAccountId: text("social_account_id").notNull(),
   name: text("name").notNull(),

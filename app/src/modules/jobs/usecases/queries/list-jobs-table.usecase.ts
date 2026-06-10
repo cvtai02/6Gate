@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, postJobs, publishDestinations } from "@/server/db/schema";
+import { accounts, postJobs, destinations } from "@/server/db/schema";
 
 @Injectable()
 export class ListJobsTableUseCase {
@@ -16,13 +16,13 @@ export class ListJobsTableUseCase {
         providerPostUrl: postJobs.providerPostUrl,
         scheduledAt: postJobs.scheduledAt,
         updatedAt: postJobs.updatedAt,
-        destinationName: publishDestinations.name,
-        destinationType: publishDestinations.type,
-        destinationAvatar: publishDestinations.avatarUrl,
+        destinationName: destinations.name,
+        destinationType: destinations.type,
+        destinationAvatar: destinations.avatarUrl,
         accountAvatar: accounts.avatarUrl,
       })
       .from(postJobs)
-      .leftJoin(publishDestinations, eq(postJobs.destinationId, publishDestinations.id))
+      .leftJoin(destinations, eq(postJobs.destinationId, destinations.id))
       .leftJoin(accounts, eq(postJobs.accountId, accounts.id))
       .orderBy(desc(postJobs.updatedAt))
       ;

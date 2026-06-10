@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { publishDestinations } from "@/server/db/schema";
+import { destinations } from "@/server/db/schema";
 import { DestinationType } from "@/lib/enums";
 import {
   extractTelegramChats,
@@ -31,8 +31,8 @@ export class SyncTelegramChatsUseCase {
 
     const existingDestinations = await db
       .select()
-      .from(publishDestinations)
-      .where(eq(publishDestinations.socialAccountId, accountId))
+      .from(destinations)
+      .where(eq(destinations.socialAccountId, accountId))
       ;
     for (const destination of existingDestinations) {
       if (destination.type !== DestinationType.TelegramChat || !destination.externalId) continue;
@@ -48,12 +48,12 @@ export class SyncTelegramChatsUseCase {
       if (result.created) created++;
       else updated++;
     }
-    const destinations = await db.select().from(publishDestinations).where(eq(publishDestinations.socialAccountId, accountId));
+    const finalDestinations = await db.select().from(destinations).where(eq(destinations.socialAccountId, accountId));
     return {
       created,
       updated,
       discovered: chats.length,
-      destinations,
+      destinations: finalDestinations,
       warning: chats.length === 0
         ? "No chats discovered yet. Add the bot to a chat and send a message, or add a chat manually."
         : undefined,

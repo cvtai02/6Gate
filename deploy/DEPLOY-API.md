@@ -38,14 +38,17 @@ sudo npm i -g pm2
 ## 3. Secrets — create app/.env
 ```bash
 cat > ~/6gate/app/.env <<'EOF'
-SYSTEM_SECRET=<your-system-secret>
+SYSTEM_SECRET=<your-login-secret>
+ENCRYPTION_KEY=<your-encryption-key>
 DATABASE_URL=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
 DATABASE_SSL=require
 EOF
 chmod 600 ~/6gate/app/.env
 ```
-> `SYSTEM_SECRET` must equal what you log in with — it also decrypts the storage
-> token already migrated into Postgres.
+> - `SYSTEM_SECRET` — what you log in with (also signs JWT sessions and the
+>   `x-system-secret` header). Rotate it freely; it only invalidates sessions.
+> - `ENCRYPTION_KEY` — **must equal the original value** used when the storage token
+>   was encrypted, or the migrated Postgres token won't decrypt. Don't rotate it.
 
 ## 4. Build + start with pm2
 ```bash

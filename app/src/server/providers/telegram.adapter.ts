@@ -2,7 +2,7 @@ import path from "path";
 import { eq } from "drizzle-orm";
 import type { PublishVideoInput, PublishVideoResult, SocialProviderAdapter } from "./types";
 import { getDb } from "@/server/db";
-import { accounts, publishDestinations } from "@/server/db/schema";
+import { accounts, destinations } from "@/server/db/schema";
 import { readVideoFile } from "./adapter-utils";
 import { appendLog } from "@/server/jobs/log-service";
 
@@ -57,8 +57,8 @@ export class TelegramAdapter implements SocialProviderAdapter {
 
     const destination = await db
       .select()
-      .from(publishDestinations)
-      .where(eq(publishDestinations.id, input.destinationId))
+      .from(destinations)
+      .where(eq(destinations.id, input.destinationId))
       .then((r) => r[0]);
     if (!destination) throw new Error(`Destination ${input.destinationId} not found`);
     if (!destination.externalId) throw new Error("Telegram destination chat ID is missing");

@@ -1,7 +1,7 @@
 import fs from "fs";
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { providers, accounts, publishDestinations } from "@/server/db/schema";
+import { providers, accounts, destinations } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { ProviderType, DestinationType } from "@/lib/enums";
 
@@ -21,7 +21,7 @@ export async function createDestinationForAccount(
   avatarUrl?: string | null
 ) {
   const db = getDb();
-  await db.insert(publishDestinations).values({
+  await db.insert(destinations).values({
     id: `dest_${nanoid(8)}`,
     socialAccountId: accountId,
     name,

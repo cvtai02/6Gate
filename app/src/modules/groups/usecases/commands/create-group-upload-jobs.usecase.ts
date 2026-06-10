@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
 import { createJob } from "@/server/jobs/job-service";
 import { startJobRunner } from "@/server/jobs/job-runner";
 import { getDestinationIconUrl } from "@/lib/destination-icons";
@@ -39,7 +39,7 @@ export class CreateGroupUploadJobsUseCase {
     }[] = [];
 
     for (const { destinationId } of links) {
-      const dest = await db.select().from(publishDestinations).where(eq(publishDestinations.id, destinationId)).then((r) => r[0]);
+      const dest = await db.select().from(destinations).where(eq(destinations.id, destinationId)).then((r) => r[0]);
       if (!dest) continue;
       const account = await db.select().from(accounts).where(eq(accounts.id, dest.socialAccountId)).then((r) => r[0]);
       if (!account) continue;

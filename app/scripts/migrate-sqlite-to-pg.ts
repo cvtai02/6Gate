@@ -19,7 +19,9 @@ loadEnv();
 import { getPool, closeDb } from "../src/server/db/index";
 
 // Postgres tables to populate, with their primary-key column (for ON CONFLICT).
-const TABLES: { name: string; pk: string }[] = [
+// `source` is the SQLite table name when it differs from the Postgres name (e.g.
+// after a table rename); defaults to `name`.
+const TABLES: { name: string; pk: string; source?: string }[] = [
   { name: "settings", pk: "key" },
   { name: "providers", pk: "id" },
   { name: "accounts", pk: "id" },
@@ -27,8 +29,7 @@ const TABLES: { name: string; pk: string }[] = [
   { name: "video_folders", pk: "id" },
   { name: "job_logs", pk: "id" },
   { name: "combos", pk: "id" },
-  { name: "combo_accounts", pk: "id" },
-  { name: "publish_destinations", pk: "id" },
+  { name: "destinations", pk: "id", source: "publish_destinations" },
   { name: "combo_destinations", pk: "id" },
   { name: "group_upload_queue", pk: "id" },
   { name: "group_upload_settings", pk: "group_id" },
@@ -46,11 +47,12 @@ async function main() {
   const pool = getPool();
 
   try {
-    for (const { name, pk } of TABLES) {
+    for (const { name, pk, source } of TABLES) {
+      const src = source ?? name;
       // Skip tables that don't exist in the source DB.
       const exists = sqlite
         .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`)
-        .get(name);
+        .get(src);
       if (!exists) {
         console.log(`[import] ${name}: not in source, skipped`);
         continue;
@@ -64,7 +66,7 @@ async function main() {
       );
       const pgCols = new Set(pgColsRes.rows.map((r) => r.column_name));
 
-      const rows = sqlite.prepare(`SELECT * FROM ${name}`).all() as Record<string, unknown>[];
+      const rows = sqlite.prepare(`SELECT * FROM ${src}`).all() as Record<string, unknown>[];
       if (rows.length === 0) {
         console.log(`[import] ${name}: 0 rows`);
         continue;

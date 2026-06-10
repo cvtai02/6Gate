@@ -86,8 +86,19 @@ export async function runMigrations() {
 
   await run(`ALTER TABLE post_jobs ADD COLUMN IF NOT EXISTS destination_id TEXT`);
 
+  // Rename legacy publish_destinations -> destinations (idempotent, preserves data).
   await run(`
-    CREATE TABLE IF NOT EXISTS publish_destinations (
+    DO $$
+    BEGIN
+      IF to_regclass('public.publish_destinations') IS NOT NULL
+         AND to_regclass('public.destinations') IS NULL THEN
+        ALTER TABLE publish_destinations RENAME TO destinations;
+      END IF;
+    END $$;
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS destinations (
       id TEXT PRIMARY KEY,
       social_account_id TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -99,8 +110,8 @@ export async function runMigrations() {
     )
   `);
 
-  await run(`ALTER TABLE publish_destinations ADD COLUMN IF NOT EXISTS access_token TEXT`);
-  await run(`ALTER TABLE publish_destinations ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+  await run(`ALTER TABLE destinations ADD COLUMN IF NOT EXISTS access_token TEXT`);
+  await run(`ALTER TABLE destinations ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
 
   // Rename legacy "Facebook" provider names/types to "Meta" (idempotent)
   await run(`UPDATE providers SET name = 'Meta' WHERE type = 'facebook' AND name != 'Meta'`);
@@ -136,15 +147,9 @@ export async function runMigrations() {
     )
   `);
 
-  await run(`
-    CREATE TABLE IF NOT EXISTS combo_accounts (
-      id TEXT PRIMARY KEY,
-      combo_id TEXT NOT NULL,
-      account_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      UNIQUE (combo_id, account_id)
-    )
-  `);
+  // Legacy: combo_accounts was the old group->account join table, replaced by
+  // combo_destinations. Unused and always empty — drop it if it exists.
+  await run(`DROP TABLE IF EXISTS combo_accounts`);
 
   await run(`
     CREATE TABLE IF NOT EXISTS combo_destinations (

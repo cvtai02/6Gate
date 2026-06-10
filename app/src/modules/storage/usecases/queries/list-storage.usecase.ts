@@ -20,7 +20,7 @@ export class ListStorageUseCase {
       id: r.id,
       name: r.name,
       baseUrl: r.baseUrl ?? "",
-      accessToken: r.accessToken ? decryptValue(r.accessToken, env.systemSecret) : "",
+      accessToken: r.accessToken ? decryptValue(r.accessToken, env.encryptionKey) : "",
       updatedAt: r.updatedAt,
     }));
   }

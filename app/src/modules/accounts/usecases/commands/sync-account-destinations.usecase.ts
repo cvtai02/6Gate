@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, providers, destinations } from "@/server/db/schema";
 import { ProviderType } from "@/lib/enums";
 import { SyncTelegramChatsUseCase } from "./sync-telegram-chats.usecase";
 import { SyncZernioUseCase } from "./sync-zernio.usecase";
@@ -21,13 +21,13 @@ export class SyncAccountDestinationsUseCase {
     if (!provider) return { error: "Provider not found" };
     if (provider.type === ProviderType.zernio) {
       await this.syncZernio.execute({ accountId });
-      const dests = await db.select().from(publishDestinations).where(eq(publishDestinations.socialAccountId, accountId));
+      const dests = await db.select().from(destinations).where(eq(destinations.socialAccountId, accountId));
       return { destinations: dests };
     }
     if (provider.type === ProviderType.telegram) {
       return this.syncTelegramChats.execute(accountId);
     }
-    const existing = await db.select().from(publishDestinations).where(eq(publishDestinations.socialAccountId, accountId));
+    const existing = await db.select().from(destinations).where(eq(destinations.socialAccountId, accountId));
     return { destinations: existing, warning: existing.length === 0 ? "No destinations available for this account." : undefined };
   }
 }

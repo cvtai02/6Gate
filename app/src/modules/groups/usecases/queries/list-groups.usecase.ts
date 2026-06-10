@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, groupDestinations, groups, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, groupDestinations, groups, providers, destinations } from "@/server/db/schema";
 
 @Injectable()
 export class ListGroupsUseCase {
@@ -11,19 +11,19 @@ export class ListGroupsUseCase {
     const allLinks = await db
       .select({
         groupId: groupDestinations.groupId,
-        destinationId: publishDestinations.id,
-        name: publishDestinations.name,
-        type: publishDestinations.type,
-        externalId: publishDestinations.externalId,
-        socialAccountId: publishDestinations.socialAccountId,
-        avatarUrl: publishDestinations.avatarUrl,
+        destinationId: destinations.id,
+        name: destinations.name,
+        type: destinations.type,
+        externalId: destinations.externalId,
+        socialAccountId: destinations.socialAccountId,
+        avatarUrl: destinations.avatarUrl,
         providerType: providers.type,
         providerName: providers.name,
         accountAvatarUrl: accounts.avatarUrl,
       })
       .from(groupDestinations)
-      .leftJoin(publishDestinations, eq(groupDestinations.destinationId, publishDestinations.id))
-      .leftJoin(accounts, eq(publishDestinations.socialAccountId, accounts.id))
+      .leftJoin(destinations, eq(groupDestinations.destinationId, destinations.id))
+      .leftJoin(accounts, eq(destinations.socialAccountId, accounts.id))
       .leftJoin(providers, eq(accounts.providerId, providers.id))
       ;
 

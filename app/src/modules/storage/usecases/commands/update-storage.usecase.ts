@@ -21,7 +21,7 @@ export class UpdateStorageUseCase {
     const updatedAt = new Date().toISOString();
     const storedToken =
       patch.accessToken !== undefined
-        ? encryptValue(patch.accessToken, env.systemSecret)
+        ? encryptValue(patch.accessToken, env.encryptionKey)
         : existing.accessToken;
 
     await db.update(router7)

@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
 import { DestinationType, ProviderType } from "@/lib/enums";
 
 export const ZERNIO_DEFAULT_BASE_URL = "https://zernio.com/api/v1";
@@ -170,24 +170,24 @@ async function syncDestinationsForLocalAccount(input: {
 
     const existingDestination = await db
       .select()
-      .from(publishDestinations)
-      .where(and(eq(publishDestinations.socialAccountId, input.localAccountId), eq(publishDestinations.externalId, remoteId)))
+      .from(destinations)
+      .where(and(eq(destinations.socialAccountId, input.localAccountId), eq(destinations.externalId, remoteId)))
       .then((r) => r[0]);
 
     if (existingDestination) {
       await db
-        .update(publishDestinations)
+        .update(destinations)
         .set({
           name,
           type: destinationType,
           avatarUrl: avatar,
         })
-        .where(eq(publishDestinations.id, existingDestination.id));
+        .where(eq(destinations.id, existingDestination.id));
       seenDestinationIds.add(existingDestination.id);
       result.updated++;
     } else {
       const id = `dest_${nanoid(8)}`;
-      await db.insert(publishDestinations).values({
+      await db.insert(destinations).values({
         id,
         socialAccountId: input.localAccountId,
         name,
@@ -207,13 +207,13 @@ async function syncDestinationsForLocalAccount(input: {
 
   const localDestinations = await db
     .select()
-    .from(publishDestinations)
-    .where(eq(publishDestinations.socialAccountId, input.localAccountId))
+    .from(destinations)
+    .where(eq(destinations.socialAccountId, input.localAccountId))
     ;
   for (const destination of localDestinations) {
     if (!seenDestinationIds.has(destination.id)) {
       await db.delete(groupDestinations).where(eq(groupDestinations.destinationId, destination.id));
-      await db.delete(publishDestinations).where(eq(publishDestinations.id, destination.id));
+      await db.delete(destinations).where(eq(destinations.id, destination.id));
     }
   }
 

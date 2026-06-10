@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { accounts, providers, publishDestinations } from "@/server/db/schema";
+import { accounts, providers, destinations } from "@/server/db/schema";
 import { DestinationType } from "@/lib/enums";
 import { syncInstagramForPage, syncThreadsForUser } from "@/server/providers/meta-ig-threads";
 import type { MetaManualConnectDto } from "../../dtos/meta-manual-connect.dto";
@@ -29,7 +29,7 @@ export class MetaManualConnectUseCase {
       createdAt: now,
       updatedAt: now,
     });
-    await db.insert(publishDestinations).values({
+    await db.insert(destinations).values({
       id: `dest_${nanoid(8)}`,
       socialAccountId: accountId,
       name: "Facebook Page",

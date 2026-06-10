@@ -9,7 +9,7 @@ const DEFAULT_STORAGE_API_URL = "http://localhost:20131";
 @Injectable()
 export class ProxyStorageRequestUseCase {
   private getToken(row: { accessToken: string | null; baseUrl: string | null }) {
-    const accessToken = row.accessToken ? decryptValue(row.accessToken, env.systemSecret) : "";
+    const accessToken = row.accessToken ? decryptValue(row.accessToken, env.encryptionKey) : "";
     if (!accessToken) throw new Error("Storage access token not configured. Set it in Settings.");
     const bad = [...accessToken].find((c) => c.codePointAt(0)! > 127);
     if (bad) throw new Error(`Stored access token contains an invalid character (U+${bad.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}). Please re-enter it in Settings.`);

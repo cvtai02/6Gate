@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { accounts, publishDestinations } from "@/server/db/schema";
+import { accounts, destinations } from "@/server/db/schema";
 import { ProviderType, PublishStatus } from "@/lib/enums";
 import { appendLog } from "@/server/jobs/log-service";
 import { getJob } from "@/server/jobs/job-service";
@@ -33,7 +33,7 @@ export class ZernioAdapter implements SocialProviderAdapter {
 
     const provider = await getProviderRecord(account.providerId);
     const destination = input.destinationId
-      ? await db.select().from(publishDestinations).where(eq(publishDestinations.id, input.destinationId)).then((r) => r[0])
+      ? await db.select().from(destinations).where(eq(destinations.id, input.destinationId)).then((r) => r[0])
       : null;
 
     const zernioAccountId = destination?.externalId ?? account.providerAccountId;

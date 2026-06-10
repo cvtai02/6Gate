@@ -5,7 +5,11 @@ const dataDir = path.join(os.homedir(), "AppData", "Local", "6Gate");
 
 export const env = {
   port: 20130,
+  // Auth: login secret + JWT signing + x-system-secret header.
   systemSecret: process.env.SYSTEM_SECRET || "changeme",
+  // Encryption-at-rest key for sensitive values (AES-256-GCM). Must stay constant
+  // across deploys or previously-encrypted DB values won't decrypt.
+  encryptionKey: process.env.ENCRYPTION_KEY || "changeme",
   dataDir,
   dbPath: path.join(dataDir, "db", "data.sqlite"),
   uploadsDir: path.join(dataDir, "uploads", "temp"),

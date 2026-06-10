@@ -31,13 +31,14 @@ git clone <your-repo> 6gate && cd 6gate/app   # or git pull on an existing check
 ```
 Create `app/.env` (do **not** commit real secrets):
 ```ini
-SYSTEM_SECRET=<your-system-secret>
+SYSTEM_SECRET=<your-login-secret>
+ENCRYPTION_KEY=<your-encryption-key>
 DATABASE_URL=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
 DATABASE_SSL=require
 ```
-> `SYSTEM_SECRET` must be the exact value your users log in with (it also decrypts
-> the AES-encrypted storage token already migrated into Postgres). Keep it identical
-> to what you've been using, or existing encrypted values won't decrypt.
+> - `SYSTEM_SECRET` is the login secret (and JWT / `x-system-secret` signer) — rotate freely.
+> - `ENCRYPTION_KEY` is the AES key for sensitive values; it **must stay identical** to the
+>   original, or the storage token already migrated into Postgres won't decrypt.
 
 ### 3. Build + run with pm2
 ```bash

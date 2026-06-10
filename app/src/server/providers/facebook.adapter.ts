@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import fs from "fs";
 import { getDb } from "@/server/db";
-import { accounts, publishDestinations } from "@/server/db/schema";
+import { accounts, destinations } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
 import {
@@ -152,23 +152,23 @@ export class FacebookAdapter implements SocialProviderAdapter {
     // Upsert one destination per page under this user account
     for (const page of pages) {
       const existingDest = await db
-        .select({ id: publishDestinations.id })
-        .from(publishDestinations)
+        .select({ id: destinations.id })
+        .from(destinations)
         .where(and(
-          eq(publishDestinations.socialAccountId, accountId),
-          eq(publishDestinations.externalId, page.id)
+          eq(destinations.socialAccountId, accountId),
+          eq(destinations.externalId, page.id)
         ))
         .then((r) => r[0]);
 
       const pageAvatarUrl = page.picture?.data?.url ?? null;
       if (existingDest) {
-        await db.update(publishDestinations).set({
+        await db.update(destinations).set({
           name: page.name,
           accessToken: page.access_token,
           avatarUrl: pageAvatarUrl,
-        }).where(eq(publishDestinations.id, existingDest.id));
+        }).where(eq(destinations.id, existingDest.id));
       } else {
-        await db.insert(publishDestinations).values({
+        await db.insert(destinations).values({
           id: `dest_${nanoid(8)}`,
           socialAccountId: accountId,
           name: page.name,
@@ -201,8 +201,8 @@ export class FacebookAdapter implements SocialProviderAdapter {
     if (input.destinationId) {
       const dest = await db
         .select()
-        .from(publishDestinations)
-        .where(eq(publishDestinations.id, input.destinationId))
+        .from(destinations)
+        .where(eq(destinations.id, input.destinationId))
         .then((r) => r[0]);
       if (!dest) throw new Error(`Destination ${input.destinationId} not found`);
       if (!dest.externalId) throw new Error(`Destination ${input.destinationId} has no page ID`);

@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { getDb } from "@/server/db";
-import { publishDestinations } from "@/server/db/schema";
+import { destinations } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { DestinationType } from "@/lib/enums";
 
@@ -18,16 +18,16 @@ async function upsertDestination(
 ) {
   const db = getDb();
   const existing = await db
-    .select({ id: publishDestinations.id })
-    .from(publishDestinations)
-    .where(and(eq(publishDestinations.socialAccountId, accountId), eq(publishDestinations.externalId, externalId)))
+    .select({ id: destinations.id })
+    .from(destinations)
+    .where(and(eq(destinations.socialAccountId, accountId), eq(destinations.externalId, externalId)))
     .then((r) => r[0]);
   if (existing) {
-    await db.update(publishDestinations)
+    await db.update(destinations)
       .set({ name, accessToken, avatarUrl })
-      .where(eq(publishDestinations.id, existing.id));
+      .where(eq(destinations.id, existing.id));
   } else {
-    await db.insert(publishDestinations).values({
+    await db.insert(destinations).values({
       id: `dest_${nanoid(8)}`, socialAccountId: accountId, name, type,
       externalId, accessToken, avatarUrl, createdAt: now,
     });
