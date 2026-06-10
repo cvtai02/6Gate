@@ -230,7 +230,7 @@ const ICON_COLORS: Record<string, string> = {
   telegram: "bg-sky-500",
 };
 
-const REDIRECT_URI = "http://localhost:20129/api/accounts/oauth/callback";
+const OAUTH_CALLBACK_PATH = "/api/accounts/oauth/callback";
 
 /* ── Configure-app modal ─────────────────────────────────────────────── */
 
@@ -266,9 +266,15 @@ function ConfigureAppModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  // Derive the OAuth redirect URI from the live origin so it's correct on any
+  // deployment (localhost, Vercel, custom domain). Set after mount to avoid SSR.
+  const [redirectUri, setRedirectUri] = useState(OAUTH_CALLBACK_PATH);
+  useEffect(() => {
+    setRedirectUri(`${window.location.origin}${OAUTH_CALLBACK_PATH}`);
+  }, []);
 
   function copyRedirectUri() {
-    navigator.clipboard.writeText(REDIRECT_URI);
+    navigator.clipboard.writeText(redirectUri);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -340,7 +346,7 @@ function ConfigureAppModal({
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-xs font-mono text-white bg-black/40 px-2 py-1.5 rounded border border-[var(--border)] truncate">
-                  {REDIRECT_URI}
+                  {redirectUri}
                 </code>
                 <button
                   type="button"
