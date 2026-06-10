@@ -5,7 +5,7 @@ import { useState } from "react";
 type UseCaseKey = "path" | "queue";
 
 const BASE_URL_DEV = "http://localhost:20130";
-const BASE_URL_PROD = "https://api.6gate.minfect.com";
+const BASE_URL_PROD = "https://6gate-api.minfect.com";
 
 const USE_CASES: { key: UseCaseKey; title: string; subtitle: string; markdown: string }[] = [
   {

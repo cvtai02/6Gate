@@ -6,7 +6,7 @@
   Browser ──▶ Vercel (Next.js UI, 6gate.minfect.com)
                  │  rewrites /api/* and SSR fetches
                  ▼
-            https://api.6gate.minfect.com   ──▶ nginx (TLS) ──▶ pm2 ▶ NestJS API :20130
+            https://6gate-api.minfect.com   ──▶ nginx (TLS) ──▶ pm2 ▶ NestJS API :20130
                                                                           │
                                                                           ▼
                                               Postgres (postgre.minfect.com:5432/sixgate, SSL)
@@ -20,9 +20,9 @@
 ## Part A — API on the VPS
 
 ### 1. DNS
-Point an **A record** `api.6gate.minfect.com` → your VPS public IP. Verify:
+Point an **A record** `6gate-api.minfect.com` → your VPS public IP. Verify:
 ```bash
-dig +short api.6gate.minfect.com
+dig +short 6gate-api.minfect.com
 ```
 
 ### 2. Get the code + secrets on the VPS
@@ -69,7 +69,7 @@ TLS uses a **Cloudflare Origin Certificate**; the domain must be Cloudflare-prox
 
 Verify end-to-end (through Cloudflare):
 ```bash
-curl -s https://api.6gate.minfect.com/api/providers -H "x-system-secret: $SYSTEM_SECRET" | head -c 200
+curl -s https://6gate-api.minfect.com/api/providers -H "x-system-secret: $SYSTEM_SECRET" | head -c 200
 ```
 
 ### 5. Redeploying later
@@ -90,7 +90,7 @@ pm2 reload 6gate-api
 3. **Environment Variables** (Production + Preview):
    | Name | Value |
    |------|-------|
-   | `API_URL` | `https://api.6gate.minfect.com` |
+   | `API_URL` | `https://6gate-api.minfect.com` |
 4. **Deploy.** Then add your UI domain (e.g. `6gate.minfect.com`) under Project → Domains.
 
 `API_URL` drives both the `/api/*` rewrite and server-side rendering fetches
@@ -105,7 +105,7 @@ pm2 reload 6gate-api
   and any large request body are proxied by Vercel when called as `/api/*` on the UI origin.
   Vercel imposes body-size and connection-duration limits that self-hosting doesn't. If you
   hit truncated uploads or dropped log streams, point those specific calls **directly** at
-  `https://api.6gate.minfect.com` from the browser — the API already sends permissive CORS
+  `https://6gate-api.minfect.com` from the browser — the API already sends permissive CORS
   (`origin: *`) in [main.ts](../app/src/main.ts), so cross-origin calls work.
 - **SYSTEM_SECRET parity.** Same value in the VPS `app/.env` and what users enter at login.
 - The `Dockerfile`s in `app/` and `ui/` are from the earlier Docker plan and are **not used**

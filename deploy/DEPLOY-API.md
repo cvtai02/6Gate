@@ -9,25 +9,22 @@ with SSL/TLS mode **Full (strict)**.
 ---
 
 ## 0. Cloudflare DNS (dashboard or API, one-time)
-- Add an **A record**: `api` → `<VPS_IP>`, **Proxy status: Proxied** (orange cloud).
+- Add an **A record**: `6gate-api` → `<VPS_IP>`, **Proxy status: Proxied** (orange cloud).
+  Single-level subdomain so Cloudflare's free `*.minfect.com` SSL covers the edge cert.
 - SSL/TLS → Overview → set mode to **Full (strict)**.
-- SSL/TLS → **Origin Server** → **Create Certificate** (default RSA, covers
-  `api.6gate.minfect.com`). Copy the **Origin Certificate** and **Private Key** —
+- SSL/TLS → **Origin Server** → **Create Certificate**. Set the hostnames to
+  `minfect.com` and `*.minfect.com` so the origin cert covers `6gate-api.minfect.com`
+  (and any future host). Copy the **Origin Certificate** and **Private Key** —
   you'll paste them in step 5.
 
 Verify DNS resolves (Cloudflare IP is expected, since it's proxied):
 ```bash
-dig +short api.6gate.minfect.com
+dig +short 6gate-api.minfect.com
 ```
 
 ---
 
 ## 1. Get the code
-```bash
-cd ~
-git clone <REPO_URL> 6gate     # or: cd ~/6gate && git pull
-cd ~/6gate/app
-```
 
 ## 2. Node + pm2 (skip anything already installed)
 ```bash
@@ -67,33 +64,12 @@ SECRET=$(grep SYSTEM_SECRET ~/6gate/app/.env | cut -d= -f2)
 curl -s -H "x-system-secret: $SECRET" http://127.0.0.1:20130/api/providers | head -c 200; echo
 ```
 
-## 5. Install the Cloudflare Origin certificate
-```bash
-sudo mkdir -p /etc/ssl/cloudflare
-
-# Paste the Origin CERTIFICATE (the cert block), save & exit:
-sudo tee /etc/ssl/cloudflare/api.6gate.minfect.com.pem >/dev/null <<'EOF'
------BEGIN CERTIFICATE-----
-... paste Cloudflare Origin Certificate here ...
------END CERTIFICATE-----
-EOF
-
-# Paste the Origin PRIVATE KEY, save & exit:
-sudo tee /etc/ssl/cloudflare/api.6gate.minfect.com.key >/dev/null <<'EOF'
------BEGIN PRIVATE KEY-----
-... paste Cloudflare Origin Private Key here ...
------END PRIVATE KEY-----
-EOF
-
-sudo chmod 600 /etc/ssl/cloudflare/api.6gate.minfect.com.key
-```
-
 ## 6. nginx site
 ```bash
-sudo cp ~/6gate/deploy/nginx/api.6gate.minfect.com.conf \
-        /etc/nginx/sites-available/api.6gate.minfect.com
-sudo ln -sf /etc/nginx/sites-available/api.6gate.minfect.com \
-            /etc/nginx/sites-enabled/api.6gate.minfect.com
+sudo cp ~/6gate/deploy/nginx/6gate-api.minfect.com.conf \
+        /etc/nginx/sites-available/6gate-api.minfect.com
+sudo ln -sf /etc/nginx/sites-available/6gate-api.minfect.com \
+            /etc/nginx/sites-enabled/6gate-api.minfect.com
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -106,7 +82,7 @@ sudo ufw deny 20130 2>/dev/null || true
 ## 8. Verify end-to-end (through Cloudflare)
 ```bash
 SECRET=$(grep SYSTEM_SECRET ~/6gate/app/.env | cut -d= -f2)
-curl -s https://api.6gate.minfect.com/api/providers -H "x-system-secret: $SECRET" | head -c 200; echo
+curl -s https://6gate-api.minfect.com/api/providers -H "x-system-secret: $SECRET" | head -c 200; echo
 ```
 Expect a JSON array of providers.
 
