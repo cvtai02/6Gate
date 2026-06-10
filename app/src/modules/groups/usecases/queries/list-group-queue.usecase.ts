@@ -9,11 +9,23 @@ import { ensureGroup } from "../shared/group-helpers";
 export class ListGroupQueueUseCase {
   async execute(groupId: string): Promise<GroupUploadQueueItemDto[]> {
     await ensureGroup(groupId);
-    return getDb()
+    const rows = await getDb()
       .select()
       .from(groupUploadQueue)
       .where(eq(groupUploadQueue.groupId, groupId))
-      .orderBy(desc(groupUploadQueue.createdAt))
-      .all();
+      .orderBy(desc(groupUploadQueue.createdAt));
+    return rows.map((r) => ({
+        id: r.id,
+        groupId: r.groupId,
+        absolutePath: r.videoPath,
+        title: r.title,
+        caption: r.caption,
+        privacy: r.privacy,
+        status: r.status,
+        uploadBatchId: r.uploadBatchId,
+        errorMessage: r.errorMessage,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      }));
   }
 }

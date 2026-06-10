@@ -10,7 +10,10 @@ export type {
   RuntimeSettingDto,
 } from "@sixgate/api-client";
 
-export const apiBaseUrl = "http://localhost:20130/api";
+// Server-side base URL for the NestJS API. In production (e.g. Vercel) set
+// API_URL to the public API origin, e.g. https://api.6gate.minfect.com.
+const API_ORIGIN = process.env.API_URL ?? "http://localhost:20130";
+export const apiBaseUrl = `${API_ORIGIN}/api`;
 
 export function createServerApiClient() {
   return new SixGateApiClient({

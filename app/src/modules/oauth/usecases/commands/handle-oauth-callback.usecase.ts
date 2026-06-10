@@ -13,7 +13,7 @@ export class HandleOauthCallbackUseCase {
       .select({ type: providers.type })
       .from(providers)
       .where(eq(providers.id, input.providerId))
-      .get();
+      .then((r) => r[0]);
     const returnBase = provider?.type ? `/providers/${provider.type}` : "/providers";
 
     try {
@@ -29,7 +29,7 @@ export class HandleOauthCallbackUseCase {
       .where(eq(accounts.providerId, input.providerId))
       .orderBy(desc(accounts.createdAt))
       .limit(1)
-      .get();
+      .then((r) => r[0]);
     const accountParam = latest?.id ? `&accountId=${latest.id}` : "";
     return `${returnBase}?connected=1${accountParam}`;
   }

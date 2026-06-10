@@ -1,6 +1,27 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function runMigrations(db: any) {
-  db.run(`
+import { getPool } from "./index";
+
+/**
+ * Postgres schema bootstrap + data fix-ups. Idempotent: safe to run on every boot.
+ * Ported from the original SQLite migrate.ts. Uses `IF NOT EXISTS` / `IF EXISTS` /
+ * `ON CONFLICT DO NOTHING` instead of SQLite's try-catch-around-ALTER idiom.
+ */
+export async function runMigrations() {
+  const pool = getPool();
+
+  const run = async (sql: string) => {
+    await pool.query(sql);
+  };
+  // For statements that may legitimately fail when a precondition is absent
+  // (e.g. migrating from a legacy table that never existed).
+  const tryRun = async (sql: string) => {
+    try {
+      await pool.query(sql);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  await run(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -8,7 +29,7 @@ export function runMigrations(db: any) {
     )
   `);
 
-  db.run(`
+  await run(`
     CREATE TABLE IF NOT EXISTS providers (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -22,28 +43,9 @@ export function runMigrations(db: any) {
     )
   `);
 
-  // Add pkce_verifier column if not already present (idempotent)
-  try { db.run(`ALTER TABLE providers ADD COLUMN pkce_verifier TEXT`); } catch {}
+  await run(`ALTER TABLE providers ADD COLUMN IF NOT EXISTS pkce_verifier TEXT`);
 
-  // Add destination_id to post_jobs for per-destination routing (idempotent)
-  try { db.run(`ALTER TABLE post_jobs ADD COLUMN destination_id TEXT`); } catch {}
-
-  // Add access_token to publish_destinations for page-level tokens (Meta) (idempotent)
-  try { db.run(`ALTER TABLE publish_destinations ADD COLUMN access_token TEXT`); } catch {}
-
-  // Add avatar_url to publish_destinations for page/channel avatars (idempotent)
-  try { db.run(`ALTER TABLE publish_destinations ADD COLUMN avatar_url TEXT`); } catch {}
-
-  // Rename legacy "Facebook" provider names to "Meta" (idempotent)
-  db.run(`UPDATE providers SET name = 'Meta' WHERE type = 'facebook' AND name != 'Meta'`);
-
-  // Rename provider type 'facebook' → 'meta' (idempotent)
-  db.run(`UPDATE providers SET type = 'meta' WHERE type = 'facebook'`);
-
-  // Fix TikTok scopes to the correct set required by TikTok's current API (idempotent)
-  db.run(`UPDATE providers SET scopes = 'user.info.basic,video.upload,video.publish' WHERE type = 'tiktok'`);
-
-  db.run(`
+  await run(`
     CREATE TABLE IF NOT EXISTS accounts (
       id TEXT PRIMARY KEY,
       provider_id TEXT NOT NULL,
@@ -56,12 +58,11 @@ export function runMigrations(db: any) {
       expires_at TEXT,
       scopes TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id)
+      updated_at TEXT NOT NULL
     )
   `);
 
-  db.run(`
+  await run(`
     CREATE TABLE IF NOT EXISTS post_jobs (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL,
@@ -79,52 +80,13 @@ export function runMigrations(db: any) {
       provider_post_url TEXT,
       error_message TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (account_id) REFERENCES accounts(id)
+      updated_at TEXT NOT NULL
     )
   `);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS video_folders (
-      id TEXT PRIMARY KEY,
-      path TEXT NOT NULL,
-      label TEXT,
-      created_at TEXT NOT NULL
-    )
-  `);
+  await run(`ALTER TABLE post_jobs ADD COLUMN IF NOT EXISTS destination_id TEXT`);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS job_logs (
-      id TEXT PRIMARY KEY,
-      job_id TEXT NOT NULL,
-      level TEXT NOT NULL,
-      message TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (job_id) REFERENCES post_jobs(id)
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS combos (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    )
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS combo_accounts (
-      id TEXT PRIMARY KEY,
-      combo_id TEXT NOT NULL,
-      account_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (combo_id) REFERENCES combos(id),
-      FOREIGN KEY (account_id) REFERENCES accounts(id),
-      UNIQUE (combo_id, account_id)
-    )
-  `);
-
-  db.run(`
+  await run(`
     CREATE TABLE IF NOT EXISTS publish_destinations (
       id TEXT PRIMARY KEY,
       social_account_id TEXT NOT NULL,
@@ -133,24 +95,68 @@ export function runMigrations(db: any) {
       external_id TEXT,
       access_token TEXT,
       avatar_url TEXT,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (social_account_id) REFERENCES accounts(id)
+      created_at TEXT NOT NULL
     )
   `);
 
-  db.run(`
+  await run(`ALTER TABLE publish_destinations ADD COLUMN IF NOT EXISTS access_token TEXT`);
+  await run(`ALTER TABLE publish_destinations ADD COLUMN IF NOT EXISTS avatar_url TEXT`);
+
+  // Rename legacy "Facebook" provider names/types to "Meta" (idempotent)
+  await run(`UPDATE providers SET name = 'Meta' WHERE type = 'facebook' AND name != 'Meta'`);
+  await run(`UPDATE providers SET type = 'meta' WHERE type = 'facebook'`);
+
+  // Fix TikTok scopes to the correct set required by TikTok's current API (idempotent)
+  await run(`UPDATE providers SET scopes = 'user.info.basic,video.upload,video.publish' WHERE type = 'tiktok'`);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS video_folders (
+      id TEXT PRIMARY KEY,
+      path TEXT NOT NULL,
+      label TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS job_logs (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL,
+      level TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS combos (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS combo_accounts (
+      id TEXT PRIMARY KEY,
+      combo_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE (combo_id, account_id)
+    )
+  `);
+
+  await run(`
     CREATE TABLE IF NOT EXISTS combo_destinations (
       id TEXT PRIMARY KEY,
       combo_id TEXT NOT NULL,
       destination_id TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      FOREIGN KEY (combo_id) REFERENCES combos(id),
-      FOREIGN KEY (destination_id) REFERENCES publish_destinations(id),
       UNIQUE (combo_id, destination_id)
     )
   `);
 
-  db.run(`
+  await run(`
     CREATE TABLE IF NOT EXISTS group_upload_queue (
       id TEXT PRIMARY KEY,
       group_id TEXT NOT NULL,
@@ -158,30 +164,30 @@ export function runMigrations(db: any) {
       title TEXT,
       caption TEXT,
       privacy TEXT,
-      scheduled_at TEXT,
       status TEXT NOT NULL,
       upload_batch_id TEXT,
       error_message TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (group_id) REFERENCES combos(id)
+      updated_at TEXT NOT NULL
     )
   `);
 
-  db.run(`
+  // Drop scheduled_at from group_upload_queue — dispatch timing is controlled by upload_time_in_day
+  await run(`ALTER TABLE group_upload_queue DROP COLUMN IF EXISTS scheduled_at`);
+
+  await run(`
     CREATE TABLE IF NOT EXISTS group_upload_settings (
       group_id TEXT PRIMARY KEY,
       upload_time_in_day TEXT NOT NULL,
       last_triggered_date TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (group_id) REFERENCES combos(id)
+      updated_at TEXT NOT NULL
     )
   `);
 
-  try { db.run(`CREATE INDEX IF NOT EXISTS idx_group_upload_queue_pick ON group_upload_queue(group_id, status, created_at)`); } catch {}
+  await run(`CREATE INDEX IF NOT EXISTS idx_group_upload_queue_pick ON group_upload_queue(group_id, status, created_at)`);
 
-  // Resilient-job columns on post_jobs (idempotent — wrap each ALTER in try/catch)
+  // Resilient-job columns on post_jobs (idempotent)
   const postJobsColumns: [string, string][] = [
     ["content_type", "TEXT"],
     ["group_id", "TEXT"],
@@ -206,21 +212,50 @@ export function runMigrations(db: any) {
     ["published_at", "TEXT"],
   ];
   for (const [name, type] of postJobsColumns) {
-    try { db.run(`ALTER TABLE post_jobs ADD COLUMN ${name} ${type}`); } catch {}
+    await run(`ALTER TABLE post_jobs ADD COLUMN IF NOT EXISTS ${name} ${type}`);
   }
 
   // Unique index for idempotency lookup; NULLs are allowed and don't collide.
-  try {
-    db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_post_jobs_idempotency_key ON post_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL`);
-  } catch {}
+  await run(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_post_jobs_idempotency_key ON post_jobs(idempotency_key) WHERE idempotency_key IS NOT NULL`,
+  );
 
   // Backfill legacy lowercase status values to the new PublishStatus enum.
-  // queued    → Created
-  // running   → Uploading   (the old runner did the upload phase under this label)
-  // completed → Published
-  // failed    → Failed       (case-only change)
-  db.run(`UPDATE post_jobs SET status = 'Created'   WHERE status = 'queued'`);
-  db.run(`UPDATE post_jobs SET status = 'Uploading' WHERE status = 'running'`);
-  db.run(`UPDATE post_jobs SET status = 'Published' WHERE status = 'completed'`);
-  db.run(`UPDATE post_jobs SET status = 'Failed'    WHERE status = 'failed'`);
+  await run(`UPDATE post_jobs SET status = 'Created'   WHERE status = 'queued'`);
+  await run(`UPDATE post_jobs SET status = 'Uploading' WHERE status = 'running'`);
+  await run(`UPDATE post_jobs SET status = 'Published' WHERE status = 'completed'`);
+  await run(`UPDATE post_jobs SET status = 'Failed'    WHERE status = 'failed'`);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS router7 (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      base_url TEXT,
+      access_token TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  // Migrate data from old 'storage' table if it exists.
+  await tryRun(`INSERT INTO router7 SELECT id, name, base_url, access_token, created_at, updated_at FROM storage ON CONFLICT (id) DO NOTHING`);
+  await tryRun(`DROP TABLE IF EXISTS storage`);
+
+  // Seed "7router" if it doesn't exist, migrating any access token from the settings table.
+  await run(`
+    INSERT INTO router7 (id, name, access_token, created_at, updated_at)
+    VALUES (
+      '7router',
+      '7router',
+      (SELECT value FROM settings WHERE key = 'storageAccessToken'),
+      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    )
+    ON CONFLICT (id) DO NOTHING
+  `);
+
+  // Remove settings that don't belong here.
+  await run(
+    `DELETE FROM settings WHERE key IN ('dataDir','dbPath','uploadsDir','logsDir','configDir','port','zernioBaseUrl','storageAccessToken','storageBaseDirectory')`,
+  );
 }

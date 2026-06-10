@@ -25,6 +25,6 @@ export class ListJobsTableUseCase {
       .leftJoin(publishDestinations, eq(postJobs.destinationId, publishDestinations.id))
       .leftJoin(accounts, eq(postJobs.accountId, accounts.id))
       .orderBy(desc(postJobs.updatedAt))
-      .all();
+      ;
   }
 }

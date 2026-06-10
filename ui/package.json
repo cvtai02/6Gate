@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@sixgate/api-client": "file:../api-clients/sixgate-api-client-0.1.0.tgz",
+    "@sixgate/api-client": "file:./vendor/sixgate-api-client",
     "nanoid": "^5.1.11",
     "next": "16.2.6",
     "react": "19.2.4",

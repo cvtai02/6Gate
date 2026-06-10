@@ -13,7 +13,7 @@ export class AddGroupDestinationUseCase {
     const db = getDb();
     await ensureGroup(groupId);
 
-    const dest = await db.select().from(publishDestinations).where(eq(publishDestinations.id, destinationId)).get();
+    const dest = await db.select().from(publishDestinations).where(eq(publishDestinations.id, destinationId)).then((r) => r[0]);
     if (!dest) {
       const err = new Error("Destination not found");
       (err as Error & { status?: number }).status = 404;
@@ -24,7 +24,7 @@ export class AddGroupDestinationUseCase {
       .select()
       .from(groupDestinations)
       .where(and(eq(groupDestinations.groupId, groupId), eq(groupDestinations.destinationId, destinationId)))
-      .get();
+      .then((r) => r[0]);
     if (existing) {
       const err = new Error("Already in group");
       (err as Error & { status?: number }).status = 409;

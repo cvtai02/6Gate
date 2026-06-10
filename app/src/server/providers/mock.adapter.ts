@@ -24,7 +24,7 @@ export class MockAdapter implements SocialProviderAdapter {
       .select()
       .from(providers)
       .where(eq(providers.id, input.providerId))
-      .get();
+      .then((r) => r[0]);
 
     if (!provider) throw new Error(`Provider ${input.providerId} not found`);
 

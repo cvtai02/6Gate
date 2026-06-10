@@ -51,7 +51,7 @@ export class TelegramAdapter implements SocialProviderAdapter {
     if (!input.destinationId) throw new Error("Telegram destination is required");
 
     const db = getDb();
-    const account = await db.select().from(accounts).where(eq(accounts.id, input.accountId)).get();
+    const account = await db.select().from(accounts).where(eq(accounts.id, input.accountId)).then((r) => r[0]);
     if (!account) throw new Error(`Account ${input.accountId} not found`);
     if (!account.accessToken) throw new Error("Telegram bot token is missing from the account");
 
@@ -59,7 +59,7 @@ export class TelegramAdapter implements SocialProviderAdapter {
       .select()
       .from(publishDestinations)
       .where(eq(publishDestinations.id, input.destinationId))
-      .get();
+      .then((r) => r[0]);
     if (!destination) throw new Error(`Destination ${input.destinationId} not found`);
     if (!destination.externalId) throw new Error("Telegram destination chat ID is missing");
 

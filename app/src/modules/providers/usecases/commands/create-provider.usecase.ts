@@ -9,7 +9,7 @@ import type { CreateProviderDto } from "../../dtos/create-provider.dto";
 export class CreateProviderUseCase {
   async execute(input: CreateProviderDto) {
     const db = getDb();
-    const existing = await db.select({ id: providers.id }).from(providers).where(eq(providers.type, input.type)).get();
+    const existing = await db.select({ id: providers.id }).from(providers).where(eq(providers.type, input.type)).then((r) => r[0]);
     if (existing) {
       throw new Error(`A ${input.type} app is already configured. Edit or remove it first.`);
     }
@@ -26,6 +26,6 @@ export class CreateProviderUseCase {
       scopes: input.scopes ? input.scopes.join(",") : null,
       createdAt: now,
     });
-    return db.select().from(providers).where(eq(providers.id, id)).get();
+    return db.select().from(providers).where(eq(providers.id, id)).then((r) => r[0]);
   }
 }

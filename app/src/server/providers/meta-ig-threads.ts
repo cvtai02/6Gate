@@ -21,7 +21,7 @@ async function upsertDestination(
     .select({ id: publishDestinations.id })
     .from(publishDestinations)
     .where(and(eq(publishDestinations.socialAccountId, accountId), eq(publishDestinations.externalId, externalId)))
-    .get();
+    .then((r) => r[0]);
   if (existing) {
     await db.update(publishDestinations)
       .set({ name, accessToken, avatarUrl })

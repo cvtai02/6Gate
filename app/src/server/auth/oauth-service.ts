@@ -9,7 +9,7 @@ export async function startOAuth(providerId: string): Promise<string> {
     .select()
     .from(providers)
     .where(eq(providers.id, providerId))
-    .get();
+    .then((r) => r[0]);
 
   if (!provider) throw new Error(`Provider ${providerId} not found`);
 
@@ -27,7 +27,7 @@ export async function handleCallback(input: {
     .select()
     .from(providers)
     .where(eq(providers.id, input.providerId))
-    .get();
+    .then((r) => r[0]);
 
   if (!provider) throw new Error(`Provider ${input.providerId} not found`);
 

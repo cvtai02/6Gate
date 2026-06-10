@@ -172,7 +172,7 @@ async function syncDestinationsForLocalAccount(input: {
       .select()
       .from(publishDestinations)
       .where(and(eq(publishDestinations.socialAccountId, input.localAccountId), eq(publishDestinations.externalId, remoteId)))
-      .get();
+      .then((r) => r[0]);
 
     if (existingDestination) {
       await db
@@ -209,7 +209,7 @@ async function syncDestinationsForLocalAccount(input: {
     .select()
     .from(publishDestinations)
     .where(eq(publishDestinations.socialAccountId, input.localAccountId))
-    .all();
+    ;
   for (const destination of localDestinations) {
     if (!seenDestinationIds.has(destination.id)) {
       await db.delete(groupDestinations).where(eq(groupDestinations.destinationId, destination.id));
@@ -222,7 +222,7 @@ async function syncDestinationsForLocalAccount(input: {
 
 export async function createZernioAccount(providerId: string, name: string, apiKey: string) {
   const db = getDb();
-  const provider = await db.select().from(providers).where(eq(providers.id, providerId)).get();
+  const provider = await db.select().from(providers).where(eq(providers.id, providerId)).then((r) => r[0]);
   if (!provider) throw new Error("Provider not found");
   if (provider.type !== ProviderType.zernio) throw new Error("Provider is not a Zernio provider");
 
@@ -253,16 +253,16 @@ export async function createZernioAccount(providerId: string, name: string, apiK
   });
 
   const sync = await syncZernioAccount(accountId);
-  const row = await db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+  const row = await db.select().from(accounts).where(eq(accounts.id, accountId)).then((r) => r[0]);
   return { account: row, sync };
 }
 
 export async function syncZernioAccount(accountId: string) {
   const db = getDb();
-  const account = await db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+  const account = await db.select().from(accounts).where(eq(accounts.id, accountId)).then((r) => r[0]);
   if (!account) throw new Error("Account not found");
 
-  const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).get();
+  const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).then((r) => r[0]);
   if (!provider) throw new Error("Provider not found");
   if (provider.type !== ProviderType.zernio) throw new Error("Provider is not a Zernio provider");
 
@@ -281,11 +281,11 @@ export async function syncZernioAccount(accountId: string) {
 
 export async function syncZernioAccounts(providerId: string) {
   const db = getDb();
-  const provider = await db.select().from(providers).where(eq(providers.id, providerId)).get();
+  const provider = await db.select().from(providers).where(eq(providers.id, providerId)).then((r) => r[0]);
   if (!provider) throw new Error("Provider not found");
   if (provider.type !== ProviderType.zernio) throw new Error("Provider is not a Zernio provider");
 
-  const localAccounts = await db.select().from(accounts).where(eq(accounts.providerId, providerId)).all();
+  const localAccounts = await db.select().from(accounts).where(eq(accounts.providerId, providerId));
   if (localAccounts.length === 0 && provider.clientSecret) {
     const legacy = await createZernioAccount(providerId, provider.name, provider.clientSecret);
     return {

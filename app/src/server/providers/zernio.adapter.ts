@@ -28,12 +28,12 @@ export class ZernioAdapter implements SocialProviderAdapter {
 
   async publishVideo(input: PublishVideoInput): Promise<PublishVideoResult> {
     const db = getDb();
-    const account = await db.select().from(accounts).where(eq(accounts.id, input.accountId)).get();
+    const account = await db.select().from(accounts).where(eq(accounts.id, input.accountId)).then((r) => r[0]);
     if (!account) throw new Error(`Account ${input.accountId} not found`);
 
     const provider = await getProviderRecord(account.providerId);
     const destination = input.destinationId
-      ? await db.select().from(publishDestinations).where(eq(publishDestinations.id, input.destinationId)).get()
+      ? await db.select().from(publishDestinations).where(eq(publishDestinations.id, input.destinationId)).then((r) => r[0])
       : null;
 
     const zernioAccountId = destination?.externalId ?? account.providerAccountId;

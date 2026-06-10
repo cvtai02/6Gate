@@ -6,8 +6,6 @@ Use this file as the root instruction index for AI agents working in 6Gate.
 
 - Keep backend code in `app/`.
 - Keep frontend code in `ui/`.
-- Keep portable TypeScript clients in `api-clients/`.
-- Keep local automation and smoke tests in `api-mcp-server/`.
 - Keep temporary coordination notes in `handoffs/`.
 - Move completed handoffs to `handoffs/archive/`.
 
@@ -25,9 +23,22 @@ Use this file as the root instruction index for AI agents working in 6Gate.
 
 ## Settings
 
-- Runtime settings are stored in the JSON file configured by `env.settingsPath`.
+- Bootstrap settings (system token, database path) are stored in `app/.env`.
+- All runtime settings are stored in the database `settings` table and managed by `modules/settings`.
 - Do not store runtime settings in `.env` files or committed JSON files.
-- If settings are changed through the UI, the app may need a restart before all changes take effect.
+- Changed settings that affect startup (e.g., port) require an app restart to take effect.
+
+## Admin UI
+
+- Admin auth uses `SYSTEM_SECRET` from `app/.env`. UI users log in via `POST /api/auth/login` which sets a signed session cookie (JWT).
+- The UI `proxy.ts` validates the session cookie and forwards it as `Authorization: Bearer <jwt>` to the backend.
+- Direct API clients can authenticate with the `x-system-secret: <secret>` header instead.
+- Both `app/.env` and `ui/.env.local` must have matching `SYSTEM_SECRET` values.
+
+## CORS
+
+- The backend allows all origins, methods, and headers.
+- The UI Next.js proxy also sets permissive CORS headers for API routes.
 
 ## Documentation
 

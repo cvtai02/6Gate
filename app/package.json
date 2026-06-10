@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
-    "start": "node dist/app/src/main.js",
+    "start": "node dist/main.js",
+    "db:migrate": "ts-node -r tsconfig-paths/register src/server/db/run-migrations.ts",
+    "db:import-sqlite": "ts-node -r tsconfig-paths/register scripts/migrate-sqlite-to-pg.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest --passWithNoTests"
   },
@@ -14,11 +16,11 @@
     "@nestjs/core": "^11.1.9",
     "@nestjs/platform-express": "^11.1.9",
     "@types/crypto-js": "^4.2.2",
-    "better-sqlite3": "^12.10.0",
     "crypto-js": "^4.2.0",
     "drizzle-orm": "^0.45.2",
     "multer": "^2.0.2",
     "nanoid": "^5.1.11",
+    "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.4.3"
@@ -26,6 +28,9 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.14",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/pg": "^8.11.10",
+    "better-sqlite3": "^12.10.0",
+    "tsconfig-paths": "^4.2.0",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
     "@types/node": "^20",

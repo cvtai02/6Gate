@@ -15,10 +15,9 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "paths": {
-      "@/*": ["src/*"],
-      "@sixgate/api-client": ["../api-clients/src/index.ts"]
+      "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "../api-clients/src/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

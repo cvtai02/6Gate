@@ -7,7 +7,7 @@ import { accounts, groupDestinations, groups, providers, publishDestinations } f
 export class ListGroupsUseCase {
   async execute() {
     const db = getDb();
-    const allGroups = await db.select().from(groups).orderBy(desc(groups.createdAt)).all();
+    const allGroups = await db.select().from(groups).orderBy(desc(groups.createdAt));
     const allLinks = await db
       .select({
         groupId: groupDestinations.groupId,
@@ -25,7 +25,7 @@ export class ListGroupsUseCase {
       .leftJoin(publishDestinations, eq(groupDestinations.destinationId, publishDestinations.id))
       .leftJoin(accounts, eq(publishDestinations.socialAccountId, accounts.id))
       .leftJoin(providers, eq(accounts.providerId, providers.id))
-      .all();
+      ;
 
     const destsByGroup = new Map<string, typeof allLinks>();
     for (const link of allLinks) {

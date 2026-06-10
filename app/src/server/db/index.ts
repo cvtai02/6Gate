@@ -1,26 +1,56 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import fs from "fs";
-import path from "path";
-import { env } from "@/server/config/env";
-import { runMigrations } from "./migrate";
+import { Pool } from "pg";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
+let _db: NodePgDatabase | null = null;
+
+function connectionString() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is not set. Provide a Postgres connection string, e.g. " +
+        "postgresql://user:pass@host:5432/sixgate",
+    );
+  }
+  return url;
+}
+
+/**
+ * SSL config. Many managed/remote Postgres servers require TLS (their pg_hba.conf
+ * rejects unencrypted connections). Enable by setting DATABASE_SSL to one of
+ * "require" / "true" / "1" / "no-verify". rejectUnauthorized is false because these
+ * servers commonly present self-signed certificates. Leave unset for local/Docker
+ * Postgres without TLS.
+ */
+function sslConfig() {
+  const v = (process.env.DATABASE_SSL ?? "").toLowerCase();
+  if (["require", "true", "1", "no-verify", "yes"].includes(v)) {
+    return { rejectUnauthorized: false };
+  }
+  return undefined;
+}
+
+export function getPool() {
+  if (_pool) return _pool;
+  // DATABASE_URL is read lazily (here) rather than at import time so the .env
+  // bootstrap loader in main.ts has already populated process.env.
+  _pool = new Pool({ connectionString: connectionString(), ssl: sslConfig() });
+  return _pool;
+}
 
 export function getDb() {
   if (_db) return _db;
-
-  const dbDir = path.dirname(env.dbPath);
-  fs.mkdirSync(dbDir, { recursive: true });
-
-  const sqlite = new Database(env.dbPath);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-
-  _db = drizzle(sqlite);
-  runMigrations(_db);
-
+  _db = drizzle(getPool());
   return _db;
 }
 
 export type Db = ReturnType<typeof getDb>;
+
+/** Close the pool — used by graceful shutdown and one-off scripts. */
+export async function closeDb() {
+  if (_pool) {
+    await _pool.end();
+    _pool = null;
+    _db = null;
+  }
+}

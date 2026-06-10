@@ -10,15 +10,8 @@ import {
   Query,
   Req,
   Res,
-  UploadedFile,
-  UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
 import type { Request, Response } from "express";
-import { tmpdir } from "os";
-import { extname } from "path";
-import { nanoid } from "nanoid";
-import { diskStorage } from "multer";
 import { AddGroupDestinationUseCase } from "../usecases/commands/add-group-destination.usecase";
 import { CreateGroupUseCase } from "../usecases/commands/create-group.usecase";
 import { CreateGroupUploadJobsUseCase } from "../usecases/commands/create-group-upload-jobs.usecase";
@@ -30,6 +23,7 @@ import { RenameGroupUseCase } from "../usecases/commands/rename-group.usecase";
 import { UpdateGroupUploadSettingsUseCase } from "../usecases/commands/update-group-upload-settings.usecase";
 import { GetGroupHistoryUseCase } from "../usecases/queries/get-group-history.usecase";
 import { GetGroupUploadSettingsUseCase } from "../usecases/queries/get-group-upload-settings.usecase";
+import { GetNextUploadTimeUseCase } from "../usecases/queries/get-next-upload-time.usecase";
 import { ListGroupQueueUseCase } from "../usecases/queries/list-group-queue.usecase";
 import { ListGroupsUseCase } from "../usecases/queries/list-groups.usecase";
 import type { AddGroupDestinationDto } from "../dtos/add-group-destination.dto";
@@ -38,7 +32,6 @@ import type { CreateUploadJobsDto } from "../dtos/create-upload-jobs.dto";
 import type { EnqueueGroupUploadDto } from "../dtos/enqueue-group-upload.dto";
 import type { RenameGroupDto } from "../dtos/rename-group.dto";
 import type { UpdateGroupUploadSettingsDto } from "../dtos/update-group-upload-settings.dto";
-import type { UploadMetadataDto } from "../dtos/upload-metadata.dto";
 
 function requestBaseUrl(req: Request) {
   return `${req.protocol}://${req.get("host")}`;
@@ -63,6 +56,7 @@ export class GroupsController {
     private readonly enqueueGroupUpload: EnqueueGroupUploadUseCase,
     private readonly removeGroupQueueItem: RemoveGroupQueueItemUseCase,
     private readonly getGroupUploadSettings: GetGroupUploadSettingsUseCase,
+    private readonly getNextUploadTime: GetNextUploadTimeUseCase,
     private readonly updateGroupUploadSettings: UpdateGroupUploadSettingsUseCase,
     private readonly createGroupUploadJobs: CreateGroupUploadJobsUseCase,
   ) {}
@@ -144,11 +138,13 @@ export class GroupsController {
   async enqueueUpload(
     @Param("id") id: string,
     @Body() body: EnqueueGroupUploadDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     try {
       res.status(201);
-      return await this.enqueueGroupUpload.execute(id, body);
+      const item = await this.enqueueGroupUpload.execute(id, body);
+      return { ...item, queueLink: new URL(`/groups/${id}/queue`, requestBaseUrl(req)).toString() };
     } catch (err) {
       res.status(statusFromError(err));
       return { error: err instanceof Error ? err.message : String(err) };
@@ -171,6 +167,16 @@ export class GroupsController {
     }
   }
 
+  @Get(["groups/:id/next-upload-time", "combos/:id/next-upload-time"])
+  async getNextUpload(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
+    try {
+      return await this.getNextUploadTime.execute(id);
+    } catch (err) {
+      res.status(statusFromError(err));
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   @Patch(["groups/:id/queue-settings", "combos/:id/queue-settings"])
   async updateUploadSettings(
     @Param("id") id: string,
@@ -185,7 +191,7 @@ export class GroupsController {
     }
   }
 
-  @Post(["groups/:id/upload-by-path", "combos/:id/upload-by-path"])
+  @Post(["groups/:id/upload", "combos/:id/upload"])
   async uploadByPath(
     @Param("id") id: string,
     @Body()
@@ -195,41 +201,6 @@ export class GroupsController {
   ) {
     try {
       return await this.createGroupUploadJobs.execute(id, body, requestBaseUrl(req));
-    } catch (err) {
-      res.status(400);
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
-  }
-
-  @Post(["groups/:id/upload", "combos/:id/upload"])
-  @UseInterceptors(
-    FileInterceptor("video", {
-      storage: diskStorage({
-        destination: tmpdir(),
-        filename: (_req, file, cb) => {
-          const ext = extname(file.originalname || "") || ".mp4";
-          cb(null, `6gate_${nanoid(8)}${ext}`);
-        },
-      }),
-      limits: { fileSize: 2 * 1024 * 1024 * 1024 },
-    }),
-  )
-  async upload(
-    @Param("id") id: string,
-    @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() body: UploadMetadataDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    if (!file) {
-      res.status(400);
-      return { error: "video file is required" };
-    }
-
-    const videoPath = file.path;
-
-    try {
-      return await this.createGroupUploadJobs.execute(id, { ...body, videoPath }, requestBaseUrl(req));
     } catch (err) {
       res.status(400);
       return { error: err instanceof Error ? err.message : String(err) };

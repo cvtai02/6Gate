@@ -1,11 +1,10 @@
 export interface GroupUploadQueueItemDto {
   id: string;
   groupId: string;
-  videoPath: string;
+  absolutePath: string;
   title: string | null;
   caption: string | null;
   privacy: string | null;
-  scheduledAt: string | null;
   status: string;
   uploadBatchId: string | null;
   errorMessage: string | null;
@@ -15,7 +14,7 @@ export interface GroupUploadQueueItemDto {
 
 export interface GroupUploadSettingsDto {
   groupId: string;
-  uploadTimeInDay: string;
+  uploadTimesInDay: string[];
   lastTriggeredDate: string | null;
   createdAt: string;
   updatedAt: string;

@@ -33,7 +33,7 @@ export class SyncTelegramChatsUseCase {
       .select()
       .from(publishDestinations)
       .where(eq(publishDestinations.socialAccountId, accountId))
-      .all();
+      ;
     for (const destination of existingDestinations) {
       if (destination.type !== DestinationType.TelegramChat || !destination.externalId) continue;
       const refreshed = await refreshTelegramChat(account.accessToken!, { id: destination.externalId }).catch(() => null);
@@ -48,7 +48,7 @@ export class SyncTelegramChatsUseCase {
       if (result.created) created++;
       else updated++;
     }
-    const destinations = await db.select().from(publishDestinations).where(eq(publishDestinations.socialAccountId, accountId)).all();
+    const destinations = await db.select().from(publishDestinations).where(eq(publishDestinations.socialAccountId, accountId));
     return {
       created,
       updated,

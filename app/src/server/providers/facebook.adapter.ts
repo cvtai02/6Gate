@@ -119,7 +119,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
       .select()
       .from(accounts)
       .where(and(eq(accounts.providerId, input.providerId), eq(accounts.providerAccountId, me.id)))
-      .get();
+      .then((r) => r[0]);
 
     let accountId: string;
     if (existingAccount) {
@@ -158,7 +158,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
           eq(publishDestinations.socialAccountId, accountId),
           eq(publishDestinations.externalId, page.id)
         ))
-        .get();
+        .then((r) => r[0]);
 
       const pageAvatarUrl = page.picture?.data?.url ?? null;
       if (existingDest) {
@@ -203,7 +203,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
         .select()
         .from(publishDestinations)
         .where(eq(publishDestinations.id, input.destinationId))
-        .get();
+        .then((r) => r[0]);
       if (!dest) throw new Error(`Destination ${input.destinationId} not found`);
       if (!dest.externalId) throw new Error(`Destination ${input.destinationId} has no page ID`);
       if (!dest.accessToken) throw new Error(`Destination ${input.destinationId} has no page token — run Sync to refresh`);

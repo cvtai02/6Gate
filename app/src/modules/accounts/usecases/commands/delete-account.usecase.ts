@@ -9,10 +9,10 @@ export class DeleteAccountUseCase {
   async execute(id: string) {
     const db = getDb();
     await getAccountOrThrow(id);
-    const jobs = await db.select({ id: postJobs.id }).from(postJobs).where(eq(postJobs.accountId, id)).all();
+    const jobs = await db.select({ id: postJobs.id }).from(postJobs).where(eq(postJobs.accountId, id));
     for (const job of jobs) await db.delete(jobLogs).where(eq(jobLogs.jobId, job.id));
     await db.delete(postJobs).where(eq(postJobs.accountId, id));
-    const dests = await db.select({ id: publishDestinations.id }).from(publishDestinations).where(eq(publishDestinations.socialAccountId, id)).all();
+    const dests = await db.select({ id: publishDestinations.id }).from(publishDestinations).where(eq(publishDestinations.socialAccountId, id));
     for (const dest of dests) await db.delete(groupDestinations).where(eq(groupDestinations.destinationId, dest.id));
     await db.delete(publishDestinations).where(eq(publishDestinations.socialAccountId, id));
     await db.delete(accounts).where(eq(accounts.id, id));

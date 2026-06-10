@@ -79,9 +79,9 @@ export async function refreshTelegramChat(botToken: string, chat: TelegramChatIn
 
 export async function getTelegramAccountOrThrow(accountId: string) {
   const db = getDb();
-  const account = await db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+  const account = await db.select().from(accounts).where(eq(accounts.id, accountId)).then((r) => r[0]);
   if (!account) throw new NotFoundException("Account not found");
-  const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).get();
+  const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).then((r) => r[0]);
   if (!provider || provider.type !== ProviderType.telegram) throw new Error("Account is not a Telegram bot account");
   if (!account.accessToken) throw new Error("Telegram bot token is missing from the account");
   return account;
@@ -97,7 +97,7 @@ export async function upsertTelegramChatDestination(accountId: string, chat: Tel
     .select()
     .from(publishDestinations)
     .where(eq(publishDestinations.socialAccountId, accountId))
-    .all();
+    ;
   const matches = existingRows.filter((row) => row.externalId === externalId || row.externalId === chatId || (chat.username && row.externalId === `@${chat.username}`));
   const existing = matches[0];
 

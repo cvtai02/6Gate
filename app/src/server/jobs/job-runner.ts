@@ -1,5 +1,5 @@
 import { getDb } from "@/server/db";
-import { accounts, postJobs, providers } from "@/server/db/schema";
+import { accounts, groupUploadQueue, postJobs, providers } from "@/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getAdapter } from "@/server/providers/registry";
 import { appendLog, emitStatus } from "./log-service";
@@ -35,7 +35,7 @@ async function processNextJob() {
     .select()
     .from(postJobs)
     .where(eq(postJobs.status, PublishStatus.Created))
-    .all();
+    ;
   const nowMs = Date.now();
   const candidate = candidates.find((job) => !job.scheduledAt || new Date(job.scheduledAt).getTime() <= nowMs);
 
@@ -49,7 +49,7 @@ async function processNextJob() {
     .set({ status: PublishStatus.Uploading, updatedAt: now })
     .where(and(eq(postJobs.id, candidate.id), eq(postJobs.status, PublishStatus.Created)))
     .returning()
-    .get();
+    .then((r) => r[0]);
 
   if (!claimed) return; // lost the race — another runner claimed it
 
@@ -64,7 +64,7 @@ async function processNextJob() {
       .select()
       .from(accounts)
       .where(eq(accounts.id, job.accountId))
-      .get();
+      .then((r) => r[0]);
 
     if (!account) throw new Error(`Account ${job.accountId} not found`);
 
@@ -72,7 +72,7 @@ async function processNextJob() {
       .select()
       .from(providers)
       .where(eq(providers.id, account.providerId))
-      .get();
+      .then((r) => r[0]);
 
     if (!provider) throw new Error(`Provider not found`);
 
@@ -110,6 +110,14 @@ async function processNextJob() {
       providerPostUrl: result.url,
     });
     await appendLog(job.id, "info", "Job completed successfully");
+
+    // Once all jobs in a batch are Published, remove the queue item
+    if (job.uploadBatchId) {
+      const batchJobs = await db.select().from(postJobs).where(eq(postJobs.uploadBatchId, job.uploadBatchId));
+      if (batchJobs.length > 0 && batchJobs.every((j) => j.status === PublishStatus.Published)) {
+        await db.delete(groupUploadQueue).where(eq(groupUploadQueue.uploadBatchId, job.uploadBatchId));
+      }
+    }
   } catch (err) {
     if (await isCancelled(job.id)) {
       await appendLog(job.id, "warn", "Upload stopped after cancellation");
@@ -137,7 +145,7 @@ async function resetOrphanedJobs() {
     PublishStatus.Retrying,
   ];
   const orphans = (
-    await db.select().from(postJobs).all()
+    await db.select().from(postJobs)
   ).filter((j) => (ACTIVE as string[]).includes(j.status));
 
   for (const job of orphans) {

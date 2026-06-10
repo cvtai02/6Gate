@@ -16,7 +16,6 @@ export class GetGroupHistoryUseCase {
         title: postJobs.title,
         caption: postJobs.caption,
         privacy: postJobs.privacy,
-        scheduledAt: postJobs.scheduledAt,
         videoPath: postJobs.videoPath,
         providerPostUrl: postJobs.providerPostUrl,
         errorMessage: postJobs.errorMessage,
@@ -36,7 +35,7 @@ export class GetGroupHistoryUseCase {
       .where(eq(postJobs.groupId, groupId))
       .orderBy(desc(postJobs.createdAt))
       .limit(safeLimit)
-      .all();
+      ;
 
     const batches = new Map<
       string,
@@ -45,7 +44,6 @@ export class GetGroupHistoryUseCase {
         title: string | null;
         caption: string | null;
         privacy: string | null;
-        scheduledAt: string | null;
         videoPath: string | null;
         createdAt: string;
         updatedAt: string;
@@ -63,7 +61,6 @@ export class GetGroupHistoryUseCase {
           title: row.title,
           caption: row.caption,
           privacy: row.privacy,
-          scheduledAt: row.scheduledAt,
           videoPath: row.videoPath,
           createdAt: row.createdAt,
           updatedAt,

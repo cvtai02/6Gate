@@ -40,7 +40,7 @@ export async function getProviderRecord(providerId: string) {
     .select()
     .from(providers)
     .where(eq(providers.id, providerId))
-    .get();
+    .then((r) => r[0]);
   if (!provider) throw new Error(`Provider ${providerId} not found`);
   if (provider.type !== ProviderType.zernio && provider.type !== ProviderType.telegram && !provider.clientId)
     throw new Error(`Provider "${provider.name}" has no Client ID configured`);
@@ -57,7 +57,7 @@ export async function getAccountRecord(accountId: string) {
     .select()
     .from(accounts)
     .where(eq(accounts.id, accountId))
-    .get();
+    .then((r) => r[0]);
   if (!account) throw new Error(`Account ${accountId} not found`);
   return account;
 }

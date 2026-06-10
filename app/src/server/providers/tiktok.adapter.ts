@@ -1,4 +1,4 @@
-﻿import { nanoid } from "nanoid";
+import { nanoid } from "nanoid";
 import { randomBytes, createHash } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
@@ -88,7 +88,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
     const providerRow = await db.select({ pkceVerifier: providersTable.pkceVerifier })
       .from(providersTable)
       .where(eq(providersTable.id, input.providerId))
-      .get();
+      .then((r) => r[0]);
     const codeVerifier = providerRow?.pkceVerifier ?? null;
     console.log("[TikTok PKCE debug] providerId:", input.providerId, "verifier len:", codeVerifier?.length, "first20:", codeVerifier?.slice(0, 20));
     if (!codeVerifier) throw new Error("PKCE verifier not found, please restart the OAuth flow");

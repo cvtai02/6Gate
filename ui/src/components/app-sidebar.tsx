@@ -6,11 +6,10 @@ import { usePathname } from "next/navigation";
 const nav = [
   { href: "/", label: "Dashboard" },
   { href: "/providers", label: "Providers" },
-  { href: "/videos", label: "Videos" },
   { href: "/groups", label: "Groups" },
+  { href: "/7router", label: "7router" },
   { href: "/usecases", label: "Use Cases" },
   { href: "/jobs", label: "Jobs" },
-  { href: "/settings", label: "Settings" },
 ];
 
 export function AppSidebar() {

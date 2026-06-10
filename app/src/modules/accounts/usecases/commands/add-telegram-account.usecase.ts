@@ -21,8 +21,8 @@ export class AddTelegramAccountUseCase {
     const db = getDb();
     const now = new Date().toISOString();
     let provider = input.providerId
-      ? await db.select().from(providers).where(eq(providers.id, input.providerId)).get()
-      : await db.select().from(providers).where(eq(providers.type, ProviderType.telegram)).get();
+      ? await db.select().from(providers).where(eq(providers.id, input.providerId)).then((r) => r[0])
+      : await db.select().from(providers).where(eq(providers.type, ProviderType.telegram)).then((r) => r[0]);
 
     if (input.providerId && !provider) throw new NotFoundException("Provider not found");
     if (provider && provider.type !== ProviderType.telegram) throw new Error("Provider is not a Telegram provider");
@@ -41,7 +41,7 @@ export class AddTelegramAccountUseCase {
         pkceVerifier: null,
         createdAt: now,
       });
-      provider = await db.select().from(providers).where(eq(providers.id, providerId)).get();
+      provider = await db.select().from(providers).where(eq(providers.id, providerId)).then((r) => r[0]);
     }
 
     if (!provider) throw new Error("Failed to create Telegram provider");
@@ -69,6 +69,6 @@ export class AddTelegramAccountUseCase {
       await this.addTelegramChat.execute(accountId, { chatId, chatName: input.chatName });
     }
 
-    return db.select().from(accounts).where(eq(accounts.id, accountId)).get();
+    return db.select().from(accounts).where(eq(accounts.id, accountId)).then((r) => r[0]);
   }
 }

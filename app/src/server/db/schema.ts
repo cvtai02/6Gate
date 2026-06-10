@@ -1,12 +1,18 @@
-import { sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { pgTable, text } from "drizzle-orm/pg-core";
 
-export const settings = sqliteTable("settings", {
+// NOTE: Postgres migration. All columns are kept as `text` (matching the original
+// SQLite design where numbers/dates were stored as ISO/encoded strings) so the
+// one-time data import from the old SQLite file is a straight value copy.
+// Foreign keys are intentionally NOT declared here — integrity is enforced at the
+// application layer, same as the original schema.
+
+export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
-export const providers = sqliteTable("providers", {
+export const providers = pgTable("providers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull(),
@@ -19,7 +25,7 @@ export const providers = sqliteTable("providers", {
   createdAt: text("created_at").notNull(),
 });
 
-export const accounts = sqliteTable("accounts", {
+export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),
   providerId: text("provider_id").notNull(),
   providerAccountId: text("provider_account_id"),
@@ -34,7 +40,7 @@ export const accounts = sqliteTable("accounts", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const postJobs = sqliteTable("post_jobs", {
+export const postJobs = pgTable("post_jobs", {
   id: text("id").primaryKey(),
   accountId: text("account_id").notNull(),
   destinationId: text("destination_id"),
@@ -86,14 +92,14 @@ export const postJobs = sqliteTable("post_jobs", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const videoFolders = sqliteTable("video_folders", {
+export const videoFolders = pgTable("video_folders", {
   id: text("id").primaryKey(),
   path: text("path").notNull(),
   label: text("label"),
   createdAt: text("created_at").notNull(),
 });
 
-export const jobLogs = sqliteTable("job_logs", {
+export const jobLogs = pgTable("job_logs", {
   id: text("id").primaryKey(),
   jobId: text("job_id").notNull(),
   level: text("level").notNull(),
@@ -101,20 +107,20 @@ export const jobLogs = sqliteTable("job_logs", {
   createdAt: text("created_at").notNull(),
 });
 
-export const groups = sqliteTable("combos", {
+export const groups = pgTable("combos", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
-export const comboAccounts = sqliteTable("combo_accounts", {
+export const comboAccounts = pgTable("combo_accounts", {
   id: text("id").primaryKey(),
   comboId: text("combo_id").notNull(),
   accountId: text("account_id").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
-export const publishDestinations = sqliteTable("publish_destinations", {
+export const publishDestinations = pgTable("publish_destinations", {
   id: text("id").primaryKey(),
   socialAccountId: text("social_account_id").notNull(),
   name: text("name").notNull(),
@@ -127,21 +133,20 @@ export const publishDestinations = sqliteTable("publish_destinations", {
   createdAt: text("created_at").notNull(),
 });
 
-export const groupDestinations = sqliteTable("combo_destinations", {
+export const groupDestinations = pgTable("combo_destinations", {
   id: text("id").primaryKey(),
   groupId: text("combo_id").notNull(),
   destinationId: text("destination_id").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
-export const groupUploadQueue = sqliteTable("group_upload_queue", {
+export const groupUploadQueue = pgTable("group_upload_queue", {
   id: text("id").primaryKey(),
   groupId: text("group_id").notNull(),
   videoPath: text("video_path").notNull(),
   title: text("title"),
   caption: text("caption"),
   privacy: text("privacy"),
-  scheduledAt: text("scheduled_at"),
   status: text("status").notNull(),
   uploadBatchId: text("upload_batch_id"),
   errorMessage: text("error_message"),
@@ -149,7 +154,16 @@ export const groupUploadQueue = sqliteTable("group_upload_queue", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const groupUploadSettings = sqliteTable("group_upload_settings", {
+export const router7 = pgTable("router7", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  baseUrl: text("base_url"),
+  accessToken: text("access_token"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const groupUploadSettings = pgTable("group_upload_settings", {
   groupId: text("group_id").primaryKey(),
   uploadTimeInDay: text("upload_time_in_day").notNull(),
   lastTriggeredDate: text("last_triggered_date"),

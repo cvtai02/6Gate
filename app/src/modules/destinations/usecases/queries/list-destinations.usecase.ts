@@ -26,7 +26,7 @@ export class ListDestinationsUseCase {
       .leftJoin(accounts, eq(publishDestinations.socialAccountId, accounts.id))
       .leftJoin(providers, eq(accounts.providerId, providers.id))
       .orderBy(desc(publishDestinations.createdAt))
-      .all();
+      ;
     if (filters.type) rows = rows.filter((r) => r.providerType === filters.type);
     if (filters.providerId) rows = rows.filter((r) => r.accountProviderId === filters.providerId);
     return rows;

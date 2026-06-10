@@ -1,3 +1,3 @@
 export interface UpdateGroupUploadSettingsDto {
-  uploadTimeInDay?: string;
+  uploadTimesInDay?: string[];
 }

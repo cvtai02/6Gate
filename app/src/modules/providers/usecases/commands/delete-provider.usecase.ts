@@ -9,11 +9,11 @@ export class DeleteProviderUseCase {
   async execute(id: string) {
     const db = getDb();
     await getProviderOrThrow(id);
-    const providerAccounts = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.providerId, id)).all();
+    const providerAccounts = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.providerId, id));
     for (const acc of providerAccounts) {
-      const jobs = await db.select({ id: postJobs.id }).from(postJobs).where(eq(postJobs.accountId, acc.id)).all();
+      const jobs = await db.select({ id: postJobs.id }).from(postJobs).where(eq(postJobs.accountId, acc.id));
       for (const job of jobs) await db.delete(jobLogs).where(eq(jobLogs.jobId, job.id));
-      const dests = await db.select({ id: publishDestinations.id }).from(publishDestinations).where(eq(publishDestinations.socialAccountId, acc.id)).all();
+      const dests = await db.select({ id: publishDestinations.id }).from(publishDestinations).where(eq(publishDestinations.socialAccountId, acc.id));
       for (const dest of dests) await db.delete(groupDestinations).where(eq(groupDestinations.destinationId, dest.id));
       await db.delete(publishDestinations).where(eq(publishDestinations.socialAccountId, acc.id));
       await db.delete(postJobs).where(eq(postJobs.accountId, acc.id));

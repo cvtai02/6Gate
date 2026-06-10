@@ -58,5 +58,5 @@ export async function getJobLogs(jobId: string) {
     .from(jobLogs)
     .where(eq(jobLogs.jobId, jobId))
     .orderBy(jobLogs.createdAt)
-    .all();
+    ;
 }

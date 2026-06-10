@@ -7,19 +7,22 @@ import { createJob } from "@/server/jobs/job-service";
 import { startJobRunner } from "@/server/jobs/job-runner";
 import { getDestinationIconUrl } from "@/lib/destination-icons";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
-import { assertExistingVideoPath } from "../shared/group-helpers";
+import { assertAbsolutePath, downloadFromStorage } from "../shared/storage-helper";
 
 @Injectable()
 export class CreateGroupUploadJobsUseCase {
   async execute(groupId: string, input: CreateUploadJobsDto, baseUrl: string) {
-    assertExistingVideoPath(input.videoPath);
+    assertAbsolutePath(input.absolutePath);
+
+    // Download from 7router once; all destination jobs share the temp file
+    const videoPath = await downloadFromStorage(input.absolutePath);
 
     const db = getDb();
     const links = await db
       .select({ destinationId: groupDestinations.destinationId })
       .from(groupDestinations)
       .where(eq(groupDestinations.groupId, groupId))
-      .all();
+      ;
 
     if (links.length === 0) throw new Error("Group has no destinations");
 
@@ -36,21 +39,20 @@ export class CreateGroupUploadJobsUseCase {
     }[] = [];
 
     for (const { destinationId } of links) {
-      const dest = await db.select().from(publishDestinations).where(eq(publishDestinations.id, destinationId)).get();
+      const dest = await db.select().from(publishDestinations).where(eq(publishDestinations.id, destinationId)).then((r) => r[0]);
       if (!dest) continue;
-      const account = await db.select().from(accounts).where(eq(accounts.id, dest.socialAccountId)).get();
+      const account = await db.select().from(accounts).where(eq(accounts.id, dest.socialAccountId)).then((r) => r[0]);
       if (!account) continue;
-      const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).get();
+      const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).then((r) => r[0]);
       if (!provider) continue;
 
       const job = await createJob({
         accountId: account.id,
         destinationId,
-        videoPath: input.videoPath!,
+        videoPath,
         title: input.title,
         caption: input.caption,
         privacy: input.privacy as "private" | "public" | "unlisted" | undefined,
-        scheduledAt: input.scheduledAt,
         groupId,
         uploadBatchId,
       });
@@ -68,6 +70,6 @@ export class CreateGroupUploadJobsUseCase {
     }
 
     startJobRunner();
-    return { groupId, uploadBatchId, scheduledAt: input.scheduledAt ?? null, jobs };
+    return { groupId, uploadBatchId, jobs };
   }
 }

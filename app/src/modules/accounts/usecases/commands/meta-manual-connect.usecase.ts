@@ -11,7 +11,7 @@ import type { MetaManualConnectDto } from "../../dtos/meta-manual-connect.dto";
 export class MetaManualConnectUseCase {
   async execute(input: MetaManualConnectDto) {
     const db = getDb();
-    const provider = await db.select().from(providers).where(eq(providers.id, input.providerId)).get();
+    const provider = await db.select().from(providers).where(eq(providers.id, input.providerId)).then((r) => r[0]);
     if (!provider) throw new Error("Provider not found");
     const now = new Date().toISOString();
     const accountId = `acc_fb_${nanoid(8)}`;

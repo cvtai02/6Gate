@@ -22,7 +22,7 @@ export class DispatchNextQueuedGroupUploadUseCase {
       .where(and(eq(groupUploadQueue.groupId, groupId), eq(groupUploadQueue.status, QUEUE_STATUS_PENDING)))
       .orderBy(groupUploadQueue.createdAt)
       .limit(1)
-      .get();
+      .then((r) => r[0]);
 
     if (!next) return null;
 
@@ -30,11 +30,10 @@ export class DispatchNextQueuedGroupUploadUseCase {
       const result = await this.createUploadJobs.execute(
         groupId,
         {
-          videoPath: next.videoPath,
+          absolutePath: next.videoPath,
           title: next.title ?? undefined,
           caption: next.caption ?? undefined,
           privacy: next.privacy ?? undefined,
-          scheduledAt: next.scheduledAt ?? undefined,
         },
         LOCAL_SCHEDULER_BASE_URL,
       );

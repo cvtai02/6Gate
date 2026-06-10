@@ -13,6 +13,7 @@ import { UpdateGroupUploadSettingsUseCase } from "./usecases/commands/update-gro
 import { ProcessDueGroupQueuesUseCase } from "./usecases/commands/process-due-group-queues.usecase";
 import { GetGroupHistoryUseCase } from "./usecases/queries/get-group-history.usecase";
 import { GetGroupUploadSettingsUseCase } from "./usecases/queries/get-group-upload-settings.usecase";
+import { GetNextUploadTimeUseCase } from "./usecases/queries/get-next-upload-time.usecase";
 import { ListGroupQueueUseCase } from "./usecases/queries/list-group-queue.usecase";
 import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
 
@@ -32,6 +33,7 @@ import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
     ProcessDueGroupQueuesUseCase,
     GetGroupHistoryUseCase,
     GetGroupUploadSettingsUseCase,
+    GetNextUploadTimeUseCase,
     ListGroupQueueUseCase,
     ListGroupsUseCase,
   ],

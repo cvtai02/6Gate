@@ -25,7 +25,7 @@ export class ListAccountsUseCase {
       .from(accounts)
       .leftJoin(providers, eq(accounts.providerId, providers.id))
       .orderBy(desc(accounts.createdAt))
-      .all();
+      ;
     return rows.filter((r) => (!filters.type || r.providerType === filters.type) && (!filters.providerId || r.providerId === filters.providerId));
   }
 }

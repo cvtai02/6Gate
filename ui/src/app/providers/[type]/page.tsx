@@ -55,6 +55,7 @@ function destUrl(dest: Destination): string | null {
   if (type === "tiktok_account" && accountUsername) return `https://www.tiktok.com/@${accountUsername}`;
   if (type === "instagram_account" && accountUsername) return `https://www.instagram.com/${accountUsername}`;
   if (type === "threads_profile" && accountUsername) return `https://www.threads.net/@${accountUsername}`;
+  if (type === "TelegramChat" && validId?.startsWith("@")) return `https://t.me/${validId.slice(1)}`;
   return null;
 }
 
@@ -64,6 +65,7 @@ const DEST_COLORS: Record<string, string> = {
   tiktok_account: "bg-gray-800",
   instagram_account: "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-400",
   threads_profile: "bg-black",
+  TelegramChat: "bg-sky-500",
 };
 const DEST_ABBR: Record<string, string> = {
   youtube_channel: "YT",
@@ -71,6 +73,7 @@ const DEST_ABBR: Record<string, string> = {
   tiktok_account: "TK",
   instagram_account: "IG",
   threads_profile: "TH",
+  TelegramChat: "TG",
 };
 const DEST_LABEL: Record<string, string> = {
   youtube_channel: "YouTube Channel",
@@ -78,6 +81,7 @@ const DEST_LABEL: Record<string, string> = {
   tiktok_account: "TikTok Account",
   instagram_account: "Instagram Account",
   threads_profile: "Threads Profile",
+  TelegramChat: "Telegram Chat",
 };
 
 /* ── Provider metadata (same as list page) ──────────────────────────── */
@@ -141,6 +145,19 @@ function MetaIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+function ZernioIcon({ className }: { className?: string }) {
+  return (
+    <img className={className} src="/icons/zernio.svg" alt="" aria-hidden="true" />
+  );
+}
+
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <img className={className} src="/icons/telegram.svg" alt="" aria-hidden="true" />
+  );
+}
+
 const PROVIDER_META: Record<string, ProviderMeta> = {
   youtube: {
     label: "YouTube",
@@ -180,12 +197,37 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     ],
     Icon: MetaIcon,
   },
+  zernio: {
+    label: "Zernio",
+    defaultScopes: "",
+    devConsole: "https://docs.zernio.com/llms-full.txt",
+    devConsoleLabel: "Zernio API docs",
+    notes: [
+      "Use Zernio as a combined provider for TikTok, Facebook Pages, Instagram, Telegram, and YouTube.",
+      "Add one or more Zernio accounts with API keys, then sync destinations from Zernio.",
+    ],
+    Icon: ZernioIcon,
+  },
+  telegram: {
+    label: "Telegram",
+    defaultScopes: "",
+    devConsole: "https://core.telegram.org/bots",
+    devConsoleLabel: "Telegram Bot API",
+    notes: [
+      "Create a bot with BotFather and copy the bot token.",
+      "Add the bot to the target group or channel with posting permission.",
+      "Optionally add the first chat ID while connecting the bot account.",
+    ],
+    Icon: TelegramIcon,
+  },
 };
 
 const ICON_COLORS: Record<string, string> = {
   youtube: "bg-red-600",
   tiktok: "bg-gray-900",
   meta: "bg-white/10",
+  zernio: "bg-transparent",
+  telegram: "bg-sky-500",
 };
 
 const REDIRECT_URI = "http://localhost:20129/api/accounts/oauth/callback";
@@ -211,6 +253,7 @@ function ConfigureAppModal({
 }) {
   const meta = PROVIDER_META[type];
   const isEdit = !!existing;
+  const isApiKeyProvider = type === ProviderType.zernio || type === ProviderType.telegram;
   const [form, setForm] = useState({
     name: existing?.name ?? `My ${meta.label} App`,
     clientId: existing?.clientId ?? "",
@@ -290,24 +333,25 @@ function ConfigureAppModal({
             />
           </div>
 
-          {/* Redirect URI */}
-          <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 space-y-2">
-            <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">
-              OAuth Redirect URI
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-white bg-black/40 px-2 py-1.5 rounded border border-[var(--border)] truncate">
-                {REDIRECT_URI}
-              </code>
-              <button
-                type="button"
-                onClick={copyRedirectUri}
-                className="text-xs text-indigo-400 hover:text-indigo-300 px-2.5 py-1.5 rounded border border-indigo-500/30 shrink-0 transition-colors"
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
+          {!isApiKeyProvider && (
+            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 space-y-2">
+              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">
+                OAuth Redirect URI
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-white bg-black/40 px-2 py-1.5 rounded border border-[var(--border)] truncate">
+                  {REDIRECT_URI}
+                </code>
+                <button
+                  type="button"
+                  onClick={copyRedirectUri}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 px-2.5 py-1.5 rounded border border-indigo-500/30 shrink-0 transition-colors"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Setup notes */}
           {meta.notes.length > 0 && (
@@ -330,39 +374,57 @@ function ConfigureAppModal({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          {!isApiKeyProvider ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5">Client ID</label>
+                <input
+                  required
+                  value={form.clientId}
+                  onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
+                  className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+                  placeholder="your-client-id"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1.5">Client Secret</label>
+                <input
+                  type="password"
+                  required={!isEdit}
+                  value={form.clientSecret}
+                  onChange={(e) => setForm((f) => ({ ...f, clientSecret: e.target.value }))}
+                  className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+                  placeholder={isEdit ? "leave blank to keep current" : "your-client-secret"}
+                />
+              </div>
+            </div>
+          ) : (
             <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Client ID</label>
+              <label className="block text-xs text-gray-400 mb-1.5">
+                {type === ProviderType.zernio ? "Base URL" : "Client ID"}
+                <span className="text-gray-600"> (optional)</span>
+              </label>
               <input
-                required
                 value={form.clientId}
                 onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
                 className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder="your-client-id"
+                placeholder={type === ProviderType.zernio ? "https://zernio.com/api/v1" : "optional"}
               />
             </div>
+          )}
+
+          {!isApiKeyProvider && (
             <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Client Secret</label>
+              <label className="block text-xs text-gray-400 mb-1.5">
+                Scopes <span className="text-gray-600">(pre-filled with recommended defaults)</span>
+              </label>
               <input
-                type="password"
-                required={!isEdit}
-                value={form.clientSecret}
-                onChange={(e) => setForm((f) => ({ ...f, clientSecret: e.target.value }))}
-                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder={isEdit ? "leave blank to keep current" : "your-client-secret"}
+                value={form.scopes}
+                onChange={(e) => setForm((f) => ({ ...f, scopes: e.target.value }))}
+                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none font-mono text-xs transition-colors"
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">
-              Scopes <span className="text-gray-600">(pre-filled with recommended defaults)</span>
-            </label>
-            <input
-              value={form.scopes}
-              onChange={(e) => setForm((f) => ({ ...f, scopes: e.target.value }))}
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none font-mono text-xs transition-colors"
-            />
-          </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-1">
             <button
@@ -519,6 +581,226 @@ function FacebookManualConnectModal({
               className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
               {submitting ? "Connecting…" : result ? "Done" : "Connect"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ZernioAccountModal({
+  provider,
+  onClose,
+  onConnected,
+}: {
+  provider: Provider;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const [form, setForm] = useState({ name: "Zernio Account", apiKey: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/accounts/zernio/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerId: provider.id,
+          name: form.name,
+          apiKey: form.apiKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to add Zernio account");
+      } else {
+        onConnected();
+        onClose();
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-white">Add Zernio Account</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">Account Name</label>
+            <input
+              required
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">API Key</label>
+            <input
+              required
+              type="password"
+              value={form.apiKey}
+              onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
+              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+              placeholder="zernio-api-key"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {submitting ? "Adding…" : "Add Account"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TelegramAccountModal({
+  provider,
+  onClose,
+  onConnected,
+}: {
+  provider: Provider;
+  onClose: () => void;
+  onConnected: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: "Telegram Bot",
+    botToken: "",
+    chatId: "",
+    chatName: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/accounts/telegram/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerId: provider.id,
+          name: form.name,
+          botToken: form.botToken,
+          chatId: form.chatId || undefined,
+          chatName: form.chatName || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to add Telegram bot");
+      } else {
+        onConnected();
+        onClose();
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-white">Add Telegram Bot</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">Bot Name</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5">Bot Token</label>
+            <input
+              required
+              type="password"
+              value={form.botToken}
+              onChange={(e) => setForm((f) => ({ ...f, botToken: e.target.value }))}
+              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+              placeholder="123456:ABC..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">Chat ID</label>
+              <input
+                value={form.chatId}
+                onChange={(e) => setForm((f) => ({ ...f, chatId: e.target.value }))}
+                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+                placeholder="@channel or -100..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">Chat Name</label>
+              <input
+                value={form.chatName}
+                onChange={(e) => setForm((f) => ({ ...f, chatName: e.target.value }))}
+                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+                placeholder="optional"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {submitting ? "Adding…" : "Add Bot"}
             </button>
           </div>
         </form>
@@ -800,9 +1082,13 @@ function ProviderSection({
   onDestinationsChanged: () => void;
 }) {
   const [showManualConnect, setShowManualConnect] = useState(false);
+  const [showApiKeyConnect, setShowApiKeyConnect] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const isFacebookProvider = provider.type === ProviderType.meta;
+  const isZernioProvider = provider.type === ProviderType.zernio;
+  const isTelegramProvider = provider.type === ProviderType.telegram;
+  const usesOAuth = !isZernioProvider && !isTelegramProvider;
 
   async function handleSync() {
     setSyncing(true);
@@ -861,6 +1147,20 @@ function ProviderSection({
           }}
         />
       )}
+      {showApiKeyConnect && isZernioProvider && (
+        <ZernioAccountModal
+          provider={provider}
+          onClose={() => setShowApiKeyConnect(false)}
+          onConnected={onDestinationsChanged}
+        />
+      )}
+      {showApiKeyConnect && isTelegramProvider && (
+        <TelegramAccountModal
+          provider={provider}
+          onClose={() => setShowApiKeyConnect(false)}
+          onConnected={onDestinationsChanged}
+        />
+      )}
 
       {/* App header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
@@ -899,12 +1199,21 @@ function ProviderSection({
               + Add Manually
             </button>
           )}
-          <button
-            onClick={() => onConnect(provider.id)}
-            className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-          >
-            + Connect Account
-          </button>
+          {usesOAuth ? (
+            <button
+              onClick={() => onConnect(provider.id)}
+              className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              + Connect Account
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowApiKeyConnect(true)}
+              className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              + Add Account
+            </button>
+          )}
           <button
             onClick={() => onDelete(provider.id)}
             className="text-xs text-gray-500 hover:text-red-400 px-2 py-1.5 rounded-lg border border-[var(--border)] hover:border-red-500/30 transition-colors"
@@ -927,10 +1236,10 @@ function ProviderSection({
             <p className="text-sm text-gray-500">No accounts connected yet</p>
             <p className="text-xs text-gray-600 mt-0.5">Add your first connection to get started</p>
             <button
-              onClick={() => onConnect(provider.id)}
+              onClick={() => usesOAuth ? onConnect(provider.id) : setShowApiKeyConnect(true)}
               className="mt-3 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg transition-colors"
             >
-              + Add Connection
+              {usesOAuth ? "+ Add Connection" : "+ Add Account"}
             </button>
           </div>
         ) : (

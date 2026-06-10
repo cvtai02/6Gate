@@ -17,6 +17,6 @@ export class CreateDestinationUseCase {
       externalId: input.externalId ?? null,
       createdAt: new Date().toISOString(),
     });
-    return getDb().select().from(publishDestinations).where(eq(publishDestinations.id, id)).get();
+    return getDb().select().from(publishDestinations).where(eq(publishDestinations.id, id)).then((r) => r[0]);
   }
 }

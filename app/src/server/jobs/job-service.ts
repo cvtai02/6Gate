@@ -37,7 +37,7 @@ export async function createJob(input: CreateJobInput) {
       .select()
       .from(postJobs)
       .where(eq(postJobs.idempotencyKey, input.idempotencyKey))
-      .get();
+      .then((r) => r[0]);
     if (existing) return { id: existing.id, status: existing.status };
   }
 
@@ -45,7 +45,7 @@ export async function createJob(input: CreateJobInput) {
     .select()
     .from(accounts)
     .where(eq(accounts.id, input.accountId))
-    .get();
+    .then((r) => r[0]);
 
   if (!account) throw new Error(`Account ${input.accountId} not found`);
 
@@ -53,7 +53,7 @@ export async function createJob(input: CreateJobInput) {
     .select()
     .from(providers)
     .where(eq(providers.id, account.providerId))
-    .get();
+    .then((r) => r[0]);
 
   if (!provider) throw new Error(`Provider for account not found`);
 
@@ -111,12 +111,12 @@ export async function createJob(input: CreateJobInput) {
 
 export async function getJob(id: string) {
   const db = getDb();
-  return db.select().from(postJobs).where(eq(postJobs.id, id)).get();
+  return db.select().from(postJobs).where(eq(postJobs.id, id)).then((r) => r[0]);
 }
 
 export async function listJobs() {
   const db = getDb();
-  return db.select().from(postJobs).orderBy(desc(postJobs.createdAt)).all();
+  return db.select().from(postJobs).orderBy(desc(postJobs.createdAt));
 }
 
 export async function updateJobStatus(
