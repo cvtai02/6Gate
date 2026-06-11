@@ -102,39 +102,38 @@ npm ci && npm run build
 pm2 reload 6gate-api
 ```
 
-## Continuous deploy (GitHub Actions → SSH)
+## Continuous deploy (GitHub Actions → SSH, password auth)
 On every push to `main` that touches `app/**`, a GitHub-hosted runner SSHes into the VPS
-and runs [deploy/remote-deploy.sh](remote-deploy.sh) (pull → build → `pm2 reload`).
-See [.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml). `app/.env`
-is gitignored, so the pull never touches it.
+(`sshpass` password auth) and runs [deploy/remote-deploy.sh](remote-deploy.sh)
+(pull → build → `pm2 reload`). See
+[.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml). `app/.env` is
+gitignored, so the pull never touches it.
 
 **One-time setup:**
 
-1. On the VPS, create a dedicated deploy keypair and authorize it:
-   ```bash
-   ssh-keygen -t ed25519 -f ~/.ssh/gh_deploy -N "" -C "github-actions-6gate"
-   cat ~/.ssh/gh_deploy.pub >> ~/.ssh/authorized_keys
-   chmod 600 ~/.ssh/authorized_keys
-   cat ~/.ssh/gh_deploy        # copy this ENTIRE private key for the next step
+1. Make sure the VPS allows password SSH for this user — in `/etc/ssh/sshd_config`:
    ```
-2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**,
-   add:
+   PasswordAuthentication yes
+   PermitRootLogin yes        # only if deploying as root
+   ```
+   then `sudo systemctl restart ssh`.
+2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**:
    | Secret | Value |
    |--------|-------|
    | `VPS_HOST` | your VPS IP (e.g. `116.118.9.84`) |
    | `VPS_USER` | `root` |
-   | `VPS_SSH_KEY` | the full contents of `~/.ssh/gh_deploy` (private key, incl. BEGIN/END lines) |
+   | `VPS_PASSWORD` | the SSH password for that user |
    | `VPS_PORT` | optional, only if SSH isn't on 22 |
 
-3. Make sure `node`/`npm`/`pm2` resolve in a non-interactive SSH shell — handled by
-   `remote-deploy.sh` (it adds `/usr/local/bin` + sources nvm if present).
+3. `node`/`npm`/`pm2` resolution in a non-interactive SSH shell is handled by
+   `remote-deploy.sh` (adds `/usr/local/bin` + sources nvm if present).
 
 **Test it:** push any change under `app/` → **Actions** tab → "Deploy API (SSH)" runs and
 the API reloads.
 
-> Security: this key has full `root` on the box. To tighten it, use a dedicated non-root
-> deploy user (owning `~/6Gate` + its pm2), or restrict the key with a `command=` forced
-> command in `authorized_keys` that only runs the deploy script.
+> Security: password auth + root is the weakest option (brute-forceable, password lives
+> in CI). Prefer an SSH key and/or a non-root deploy user when you can. Rotate the
+> password if it's ever exposed.
 
 ## Notes
 - **1 pm2 instance only** (set in `ecosystem.config.js`) — the job runner + SSE keep
