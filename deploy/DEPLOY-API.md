@@ -95,12 +95,39 @@ Expect a JSON array of providers.
 
 ---
 
-## Redeploy later
+## Redeploy later (manual)
 ```bash
-cd ~/6gate && git pull && cd app
+cd ~/6Gate && git pull && cd app
 npm ci && npm run build
 pm2 reload 6gate-api
 ```
+
+## Continuous deploy (GitHub Actions → self-hosted runner)
+On every push to `main` that touches `app/**`, a self-hosted runner on the VPS pulls,
+builds, and `pm2 reload`s — see [.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml).
+No SSH keys or secrets; `app/.env` is gitignored and never touched.
+
+**One-time runner setup on the VPS:**
+1. GitHub → repo **Settings → Actions → Runners → New self-hosted runner** (Linux x64).
+   Copy the download + `config.sh` commands it shows.
+2. On the VPS, in a dedicated folder (don't reuse a runner registered to another repo):
+   ```bash
+   mkdir -p ~/actions-runner-6gate && cd ~/actions-runner-6gate
+   # paste the `curl ... | tar xz` download line from GitHub, then:
+   export RUNNER_ALLOW_RUNASROOT=1      # needed because pm2 runs as root here
+   ./config.sh --url https://github.com/cvtai02/6Gate --token <TOKEN_FROM_GITHUB>
+   ```
+3. Install it as a service running as **root** (so `pm2 reload 6gate-api` finds the process):
+   ```bash
+   sudo ./svc.sh install root
+   sudo ./svc.sh start
+   sudo ./svc.sh status
+   ```
+4. Make sure `node`, `npm`, `pm2` are on root's PATH (they are with an apt/NodeSource
+   install). If you used nvm, add its `PATH`/`source` to the runner's environment.
+
+**Test it:** push any change under `app/` → GitHub **Actions** tab shows the workflow
+run on your runner; the API reloads automatically.
 
 ## Notes
 - **1 pm2 instance only** (set in `ecosystem.config.js`) — the job runner + SSE keep
