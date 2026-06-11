@@ -3,8 +3,6 @@ import type { Request, Response } from "express";
 import { env } from "@/server/config/env";
 import { signSession, verifySession } from "@/lib/jwt";
 
-const COOKIE_OPTS = { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: 86400 * 30 };
-
 @Controller("auth")
 export class AuthController {
   @Post("login")
@@ -14,14 +12,15 @@ export class AuthController {
       res.status(401);
       return { ok: false, error: "Invalid system secret" };
     }
-    res.cookie("session", signSession(env.systemSecret), COOKIE_OPTS);
-    return { ok: true };
+    // Token-based auth: return the signed session token in the body. The UI stores
+    // it in localStorage and sends it as `Authorization: Bearer <token>`.
+    return { ok: true, token: signSession(env.systemSecret) };
   }
 
   @Post("logout")
   @HttpCode(200)
-  logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie("session", { path: "/" });
+  logout() {
+    // Stateless tokens: nothing to revoke server-side. The client drops the token.
     return { ok: true };
   }
 

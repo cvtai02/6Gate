@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-const LS_KEY = "6gate_system_secret";
+import { useState } from "react";
+import { setToken } from "@/lib/auth";
 
 export default function LoginPage() {
   const [secret, setSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(LS_KEY);
-    if (saved) setSecret(saved);
-  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,10 +19,10 @@ export default function LoginPage() {
         body: JSON.stringify({ secret }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data.ok || !data.token) {
         setError(data.error ?? "Invalid system secret");
       } else {
-        localStorage.setItem(LS_KEY, secret);
+        setToken(data.token);
         window.location.href = "/";
       }
     } catch {
