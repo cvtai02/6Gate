@@ -102,32 +102,39 @@ npm ci && npm run build
 pm2 reload 6gate-api
 ```
 
-## Continuous deploy (GitHub Actions → self-hosted runner)
-On every push to `main` that touches `app/**`, a self-hosted runner on the VPS pulls,
-builds, and `pm2 reload`s — see [.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml).
-No SSH keys or secrets; `app/.env` is gitignored and never touched.
+## Continuous deploy (GitHub Actions → SSH)
+On every push to `main` that touches `app/**`, a GitHub-hosted runner SSHes into the VPS
+and runs [deploy/remote-deploy.sh](remote-deploy.sh) (pull → build → `pm2 reload`).
+See [.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml). `app/.env`
+is gitignored, so the pull never touches it.
 
-**One-time runner setup on the VPS:**
-1. GitHub → repo **Settings → Actions → Runners → New self-hosted runner** (Linux x64).
-   Copy the download + `config.sh` commands it shows.
-2. On the VPS, in a dedicated folder (don't reuse a runner registered to another repo):
-   ```bash
-   mkdir -p ~/actions-runner-6gate && cd ~/actions-runner-6gate
-   # paste the `curl ... | tar xz` download line from GitHub, then:
-   export RUNNER_ALLOW_RUNASROOT=1      # needed because pm2 runs as root here
-   ./config.sh --url https://github.com/cvtai02/6Gate --token <TOKEN_FROM_GITHUB>
-   ```
-3. Install it as a service running as **root** (so `pm2 reload 6gate-api` finds the process):
-   ```bash
-   sudo ./svc.sh install root
-   sudo ./svc.sh start
-   sudo ./svc.sh status
-   ```
-4. Make sure `node`, `npm`, `pm2` are on root's PATH (they are with an apt/NodeSource
-   install). If you used nvm, add its `PATH`/`source` to the runner's environment.
+**One-time setup:**
 
-**Test it:** push any change under `app/` → GitHub **Actions** tab shows the workflow
-run on your runner; the API reloads automatically.
+1. On the VPS, create a dedicated deploy keypair and authorize it:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/gh_deploy -N "" -C "github-actions-6gate"
+   cat ~/.ssh/gh_deploy.pub >> ~/.ssh/authorized_keys
+   chmod 600 ~/.ssh/authorized_keys
+   cat ~/.ssh/gh_deploy        # copy this ENTIRE private key for the next step
+   ```
+2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**,
+   add:
+   | Secret | Value |
+   |--------|-------|
+   | `VPS_HOST` | your VPS IP (e.g. `116.118.9.84`) |
+   | `VPS_USER` | `root` |
+   | `VPS_SSH_KEY` | the full contents of `~/.ssh/gh_deploy` (private key, incl. BEGIN/END lines) |
+   | `VPS_PORT` | optional, only if SSH isn't on 22 |
+
+3. Make sure `node`/`npm`/`pm2` resolve in a non-interactive SSH shell — handled by
+   `remote-deploy.sh` (it adds `/usr/local/bin` + sources nvm if present).
+
+**Test it:** push any change under `app/` → **Actions** tab → "Deploy API (SSH)" runs and
+the API reloads.
+
+> Security: this key has full `root` on the box. To tighten it, use a dedicated non-root
+> deploy user (owning `~/6Gate` + its pm2), or restrict the key with a `command=` forced
+> command in `authorized_keys` that only runs the deploy script.
 
 ## Notes
 - **1 pm2 instance only** (set in `ecosystem.config.js`) — the job runner + SSE keep

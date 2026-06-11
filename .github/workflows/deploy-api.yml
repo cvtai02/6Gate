@@ -1,41 +1,46 @@
-name: Deploy API (self-hosted)
+name: Deploy API (SSH)
 
-# Continuous deploy for the 6Gate API on the VPS.
-# On push to main that touches app/**, the self-hosted runner on the VPS pulls the
-# latest code, rebuilds, and gracefully reloads the pm2 process. The UI is deployed
-# separately by Vercel, so it's intentionally not handled here.
+# Continuous deploy for the 6Gate API. On push to main touching app/**, a
+# GitHub-hosted runner SSHes into the VPS and runs deploy/remote-deploy.sh
+# (git pull -> npm ci -> build -> pm2 reload). The UI is deployed by Vercel.
 #
-# Requirements (one-time, see deploy/DEPLOY-API.md):
-#   - A self-hosted runner registered to this repo, running as the SAME user that owns
-#     ~/6Gate and the pm2 process (root, in this setup) so `pm2 reload` finds 6gate-api.
-#   - node, npm and pm2 available on that user's PATH.
-#   - app/.env present on the VPS (gitignored — never touched by the pull).
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST     - server IP/hostname (e.g. 116.118.9.84)
+#   VPS_USER     - ssh user (e.g. root)
+#   VPS_SSH_KEY  - private key whose public half is in the VPS authorized_keys
+#   VPS_PORT     - optional, defaults to 22
 
 on:
   push:
     branches: [main]
     paths:
       - "app/**"
+      - "deploy/remote-deploy.sh"
       - ".github/workflows/deploy-api.yml"
   workflow_dispatch: {}
 
-# Never run two deploys at once; let an in-flight one finish.
 concurrency:
   group: deploy-api
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
-      - name: Pull, build, reload
+      - uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_PORT }}
         run: |
           set -euo pipefail
-          cd "$HOME/6Gate"
-          git fetch origin main
-          git reset --hard origin/main          # discard local drift; .env is gitignored so it's untouched
-          cd app
-          npm ci
-          npm run build                          # -> dist/main.js (runs DB migrations on boot)
-          pm2 reload 6gate-api --update-env || pm2 start ecosystem.config.js
-          pm2 save
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$PORT" \
+            -o StrictHostKeyChecking=accept-new \
+            "$SSH_USER@$SSH_HOST" 'bash -s' < deploy/remote-deploy.sh
