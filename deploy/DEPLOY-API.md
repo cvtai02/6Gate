@@ -12,10 +12,17 @@ with SSL/TLS mode **Full (strict)**.
 - Add an **A record**: `6gate-api` → `<VPS_IP>`, **Proxy status: Proxied** (orange cloud).
   Single-level subdomain so Cloudflare's free `*.minfect.com` SSL covers the edge cert.
 - SSL/TLS → Overview → set mode to **Full (strict)**.
-- SSL/TLS → **Origin Server** → **Create Certificate**. Set the hostnames to
-  `minfect.com` and `*.minfect.com` so the origin cert covers `6gate-api.minfect.com`
-  (and any future host). Copy the **Origin Certificate** and **Private Key** —
-  you'll paste them in step 5.
+- SSL/TLS → **Origin Server** → **Create Certificate** with hostnames `minfect.com`
+  and `*.minfect.com` (the wildcard covers `6gate-api.minfect.com` and every other
+  app on this box). Save it once on the VPS as a **shared** cert:
+  ```bash
+  sudo mkdir -p /etc/nginx/ssl
+  sudo tee /etc/nginx/ssl/minfect.com.pem >/dev/null   # paste Origin Certificate, Ctrl-D
+  sudo tee /etc/nginx/ssl/minfect.com.key >/dev/null   # paste Private Key, Ctrl-D
+  sudo chmod 600 /etc/nginx/ssl/minfect.com.key
+  ```
+  The nginx conf points `ssl_certificate` at this shared file — if it already exists
+  (other sites use it), skip this.
 
 Verify DNS resolves (Cloudflare IP is expected, since it's proxied):
 ```bash

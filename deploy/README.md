@@ -62,10 +62,12 @@ curl -s -H "x-system-secret: $SYSTEM_SECRET" http://127.0.0.1:20130/api/provider
 > localhost): `sudo ufw allow 'Nginx Full' && sudo ufw deny 20130`.
 
 ### 4. nginx + TLS (Cloudflare Origin cert — no certbot)
-TLS uses a **Cloudflare Origin Certificate**; the domain must be Cloudflare-proxied
-(orange cloud) with SSL mode **Full (strict)**. Full copy-paste CLI is in
-**[DEPLOY-API.md](DEPLOY-API.md)** (steps 5–8): install the origin cert/key under
-`/etc/ssl/cloudflare/`, `cp` the nginx conf, `nginx -t && reload`.
+TLS uses a shared **Cloudflare Origin Certificate** for `*.minfect.com`; the domain
+must be Cloudflare-proxied (orange cloud) with SSL mode **Full (strict)**. The host
+**must be a single-level subdomain** (`6gate-api.minfect.com`, not `api.6gate.minfect.com`)
+so Cloudflare's free edge SSL (`*.minfect.com`) covers it. Full copy-paste CLI is in
+**[DEPLOY-API.md](DEPLOY-API.md)**: save the wildcard origin cert at
+`/etc/nginx/ssl/minfect.com.{pem,key}`, `cp` the nginx conf, `nginx -t && reload`.
 
 Verify end-to-end (through Cloudflare):
 ```bash
