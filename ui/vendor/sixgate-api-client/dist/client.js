@@ -86,6 +86,12 @@ export class SixGateApiClient {
     uploadGroupByPath(id, body) {
         return this.post(`/groups/${encodeURIComponent(id)}/upload-by-path`, body);
     }
+    uploadGroupFile(id, body) {
+        return this.post(`/groups/${encodeURIComponent(id)}/upload-file`, body);
+    }
+    enqueueGroupFile(id, body) {
+        return this.post(`/groups/${encodeURIComponent(id)}/queue-file`, body);
+    }
     listJobs() {
         return this.get("/post-jobs");
     }

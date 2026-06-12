@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { existsSync } from "fs";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
 import { groupUploadQueue } from "@/infrastructure/db/schema";
@@ -27,16 +28,21 @@ export class DispatchNextQueuedGroupUploadUseCase {
     if (!next) return null;
 
     try {
-      const result = await this.createUploadJobs.execute(
-        groupId,
-        {
-          absolutePath: next.videoPath,
-          title: next.title ?? undefined,
-          caption: next.caption ?? undefined,
-          privacy: next.privacy ?? undefined,
-        },
-        LOCAL_SCHEDULER_BASE_URL,
-      );
+      const metadata = {
+        title: next.title ?? undefined,
+        caption: next.caption ?? undefined,
+        privacy: next.privacy ?? undefined,
+      };
+      const result = existsSync(next.videoPath)
+        ? await this.createUploadJobs.executeFromLocalFile(groupId, next.videoPath, metadata, LOCAL_SCHEDULER_BASE_URL)
+        : await this.createUploadJobs.execute(
+            groupId,
+            {
+              absolutePath: next.videoPath,
+              ...metadata,
+            },
+            LOCAL_SCHEDULER_BASE_URL,
+          );
       await db
         .update(groupUploadQueue)
         .set({

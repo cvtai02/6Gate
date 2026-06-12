@@ -10,11 +10,21 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { mkdirSync } from "fs";
+import { extname } from "path";
 import type { Request, Response } from "express";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { diskStorage } from "multer";
+import { nanoid } from "nanoid";
+import { env } from "@/infrastructure/config/env";
 import { AddGroupDestinationUseCase } from "../usecases/commands/add-group-destination.usecase";
 import { CreateGroupUseCase } from "../usecases/commands/create-group.usecase";
+import { CreateGroupUploadFileJobsUseCase } from "../usecases/commands/create-group-upload-file-jobs.usecase";
 import { CreateGroupUploadJobsUseCase } from "../usecases/commands/create-group-upload-jobs.usecase";
+import { EnqueueGroupUploadFileUseCase } from "../usecases/commands/enqueue-group-upload-file.usecase";
 import { EnqueueGroupUploadUseCase } from "../usecases/commands/enqueue-group-upload.usecase";
 import { RemoveGroupUseCase } from "../usecases/commands/remove-group.usecase";
 import { RemoveGroupDestinationUseCase } from "../usecases/commands/remove-group-destination.usecase";
@@ -32,6 +42,20 @@ import type { CreateUploadJobsDto } from "../dtos/create-upload-jobs.dto";
 import type { EnqueueGroupUploadDto } from "../dtos/enqueue-group-upload.dto";
 import type { RenameGroupDto } from "../dtos/rename-group.dto";
 import type { UpdateGroupUploadSettingsDto } from "../dtos/update-group-upload-settings.dto";
+import type { UploadedFileMetadataDto } from "../dtos/uploaded-file-metadata.dto";
+
+const uploadedVideoInterceptor = FileInterceptor("file", {
+  storage: diskStorage({
+    destination: (_req, _file, cb) => {
+      mkdirSync(env.uploadsDir, { recursive: true });
+      cb(null, env.uploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = extname(file.originalname);
+      cb(null, `${nanoid(10)}${ext}`);
+    },
+  }),
+});
 
 function requestBaseUrl(req: Request) {
   return `${req.protocol}://${req.get("host")}`;
@@ -58,7 +82,9 @@ export class GroupsController {
     private readonly getGroupUploadSettings: GetGroupUploadSettingsUseCase,
     private readonly getNextUploadTime: GetNextUploadTimeUseCase,
     private readonly updateGroupUploadSettings: UpdateGroupUploadSettingsUseCase,
+    private readonly createGroupUploadFileJobs: CreateGroupUploadFileJobsUseCase,
     private readonly createGroupUploadJobs: CreateGroupUploadJobsUseCase,
+    private readonly enqueueGroupUploadFile: EnqueueGroupUploadFileUseCase,
   ) {}
 
   @Get(["groups", "combos"])
@@ -151,6 +177,26 @@ export class GroupsController {
     }
   }
 
+  @Post(["groups/:id/queue-file", "combos/:id/queue-file"])
+  @UseInterceptors(uploadedVideoInterceptor)
+  async enqueueUploadFile(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: UploadedFileMetadataDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      if (!file?.path) throw new Error("file is required");
+      res.status(201);
+      const item = await this.enqueueGroupUploadFile.execute(id, file.path, body);
+      return { ...item, queueLink: new URL(`/groups/${id}/queue`, requestBaseUrl(req)).toString() };
+    } catch (err) {
+      res.status(statusFromError(err));
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
   @Delete(["groups/:id/queue/:itemId", "combos/:id/queue/:itemId"])
   @HttpCode(204)
   removeQueueItem(@Param("id") id: string, @Param("itemId") itemId: string) {
@@ -201,6 +247,24 @@ export class GroupsController {
   ) {
     try {
       return await this.createGroupUploadJobs.execute(id, body, requestBaseUrl(req));
+    } catch (err) {
+      res.status(400);
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  @Post(["groups/:id/upload-file", "combos/:id/upload-file"])
+  @UseInterceptors(uploadedVideoInterceptor)
+  async uploadFile(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: UploadedFileMetadataDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      if (!file?.path) throw new Error("file is required");
+      return await this.createGroupUploadFileJobs.execute(id, file.path, body, requestBaseUrl(req));
     } catch (err) {
       res.status(400);
       return { error: err instanceof Error ? err.message : String(err) };

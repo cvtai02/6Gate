@@ -9,6 +9,12 @@ import { getDestinationIconUrl } from "@/core/destination-icons";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
 import { assertAbsolutePath, downloadFromStorage } from "../shared/storage-helper";
 
+type UploadJobMetadata = {
+  title?: string;
+  caption?: string;
+  privacy?: string;
+};
+
 @Injectable()
 export class CreateGroupUploadJobsUseCase {
   async execute(groupId: string, input: CreateUploadJobsDto, baseUrl: string) {
@@ -16,7 +22,14 @@ export class CreateGroupUploadJobsUseCase {
 
     // Download from 7router once; all destination jobs share the temp file
     const videoPath = await downloadFromStorage(input.absolutePath);
+    return this.createJobsForFile(groupId, videoPath, input, baseUrl);
+  }
 
+  async executeFromLocalFile(groupId: string, videoPath: string, input: UploadJobMetadata, baseUrl: string) {
+    return this.createJobsForFile(groupId, videoPath, input, baseUrl);
+  }
+
+  private async createJobsForFile(groupId: string, videoPath: string, input: UploadJobMetadata, baseUrl: string) {
     const db = getDb();
     const links = await db
       .select({ destinationId: groupDestinations.destinationId })

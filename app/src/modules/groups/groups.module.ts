@@ -2,8 +2,10 @@ import { Module } from "@nestjs/common";
 import { GroupsController } from "./api/groups.controller";
 import { AddGroupDestinationUseCase } from "./usecases/commands/add-group-destination.usecase";
 import { CreateGroupUseCase } from "./usecases/commands/create-group.usecase";
+import { CreateGroupUploadFileJobsUseCase } from "./usecases/commands/create-group-upload-file-jobs.usecase";
 import { CreateGroupUploadJobsUseCase } from "./usecases/commands/create-group-upload-jobs.usecase";
 import { DispatchNextQueuedGroupUploadUseCase } from "./usecases/commands/dispatch-next-queued-group-upload.usecase";
+import { EnqueueGroupUploadFileUseCase } from "./usecases/commands/enqueue-group-upload-file.usecase";
 import { EnqueueGroupUploadUseCase } from "./usecases/commands/enqueue-group-upload.usecase";
 import { RemoveGroupUseCase } from "./usecases/commands/remove-group.usecase";
 import { RemoveGroupDestinationUseCase } from "./usecases/commands/remove-group-destination.usecase";
@@ -22,8 +24,10 @@ import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
   providers: [
     AddGroupDestinationUseCase,
     CreateGroupUseCase,
+    CreateGroupUploadFileJobsUseCase,
     CreateGroupUploadJobsUseCase,
     DispatchNextQueuedGroupUploadUseCase,
+    EnqueueGroupUploadFileUseCase,
     EnqueueGroupUploadUseCase,
     RemoveGroupUseCase,
     RemoveGroupDestinationUseCase,

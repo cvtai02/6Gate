@@ -29,6 +29,8 @@ export declare class SixGateApiClient {
     createGroup(name: string): Promise<GroupDto>;
     getGroupHistory(id: string): Promise<GroupHistoryDto>;
     uploadGroupByPath(id: string, body: unknown): Promise<unknown>;
+    uploadGroupFile(id: string, body: FormData): Promise<unknown>;
+    enqueueGroupFile(id: string, body: FormData): Promise<unknown>;
     listJobs(): Promise<JobDto[]>;
     getJob(id: string): Promise<JobDto & {
         logs?: unknown[];

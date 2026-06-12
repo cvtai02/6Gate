@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type UseCaseKey = "path" | "queue";
+type UseCaseKey = "path" | "file" | "queue" | "queueFile";
 
 const BASE_URL_DEV = "http://localhost:20130";
 const BASE_URL_PROD = "https://6gate-api.minfect.com";
@@ -114,6 +114,83 @@ POST /api/post-jobs/{jobId}/cancel
 `,
   },
   {
+    key: "file",
+    title: "Upload a file stream immediately",
+    subtitle: "Send multipart/form-data; the API stores the file and starts jobs immediately",
+    markdown: `# 6Gate API instructions: upload a file stream to a group
+
+Use this when the client has the video bytes, not a server-readable path or a 7router path. The request uploads the file as \`multipart/form-data\`; the API streams it to backend storage, then immediately creates one post job per destination.
+
+Base URL (dev):  ${BASE_URL_DEV}
+Base URL (prod): ${BASE_URL_PROD}
+
+## 1. Upload the file and create jobs
+
+\`\`\`http
+POST /api/groups/{groupId}/upload-file
+Content-Type: multipart/form-data
+\`\`\`
+
+Multipart fields:
+- \`file\`: required video file.
+- \`title\`: optional.
+- \`caption\`: optional.
+- \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
+
+\`\`\`js
+const form = new FormData();
+form.set("file", fileInput.files[0]);
+form.set("title", "Optional title");
+form.set("caption", "Optional caption or description");
+form.set("privacy", "public");
+
+const res = await fetch("/api/groups/{groupId}/upload-file", {
+  method: "POST",
+  body: form,
+});
+const data = await res.json();
+\`\`\`
+
+Successful response:
+
+\`\`\`json
+{
+  "groupId": "group_Ab3Xy7Zq",
+  "uploadBatchId": "batch_Kp2mNx4qRs",
+  "jobs": [
+    {
+      "id": "job_Kp2mNx4qRs",
+      "destinationId": "dest_Yz9wQv1b",
+      "destinationName": "My Channel",
+      "destinationIcon": "{baseUrl}/icons/youtube.svg",
+      "platform": "youtube",
+      "jobDetailsLink": "{baseUrl}/jobs/job_Kp2mNx4qRs",
+      "jobEventsLink": "{baseUrl}/api/post-jobs/job_Kp2mNx4qRs/events",
+      "jobCancelLink": "{baseUrl}/api/post-jobs/job_Kp2mNx4qRs/cancel"
+    }
+  ]
+}
+\`\`\`
+
+The backend keeps the uploaded file until all destination jobs have finished reading it.
+
+## 2. Monitor each job
+
+\`\`\`http
+GET /api/post-jobs/{jobId}/events
+Accept: text/event-stream
+\`\`\`
+
+Polling fallback:
+
+\`\`\`http
+GET /api/post-jobs/{jobId}
+\`\`\`
+
+Terminal statuses are \`Published\`, \`Failed\`, and \`Cancelled\`.
+`,
+  },
+  {
     key: "queue",
     title: "Schedule uploads with a group queue",
     subtitle: "Enqueue videos and let the scheduler dispatch one per day",
@@ -216,6 +293,86 @@ GET /api/post-jobs/{jobId}
 \`\`\`
 
 Terminal statuses: \`Published\`, \`Failed\`, \`Cancelled\`.
+`,
+  },
+  {
+    key: "queueFile",
+    title: "Schedule an uploaded file",
+    subtitle: "Upload multipart/form-data now; dispatch it later from the group queue",
+    markdown: `# 6Gate API instructions: schedule an uploaded file with a group queue
+
+Use this when the client has a video file and wants 6Gate to store it now, then publish it later at the group's configured queue time. This is the file-upload version of the 7router queue flow.
+
+Base URL (dev):  ${BASE_URL_DEV}
+Base URL (prod): ${BASE_URL_PROD}
+
+## 1. Add an uploaded file to the queue
+
+\`\`\`http
+POST /api/groups/{groupId}/queue-file
+Content-Type: multipart/form-data
+\`\`\`
+
+Multipart fields:
+- \`file\`: required video file.
+- \`title\`: optional.
+- \`caption\`: optional.
+- \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
+
+\`\`\`js
+const form = new FormData();
+form.set("file", fileInput.files[0]);
+form.set("title", "Optional title");
+form.set("caption", "Optional caption or description");
+form.set("privacy", "public");
+
+const res = await fetch("/api/groups/{groupId}/queue-file", {
+  method: "POST",
+  body: form,
+});
+const item = await res.json();
+\`\`\`
+
+Response (201):
+
+\`\`\`json
+{
+  "id": "gqueue_Kp2mNx4qRs",
+  "groupId": "grp_abc123",
+  "absolutePath": "C:/Users/.../AppData/Local/6Gate/uploads/temp/file.mp4",
+  "title": "Optional title",
+  "caption": "Optional caption or description",
+  "privacy": "public",
+  "status": "Pending",
+  "uploadBatchId": null,
+  "errorMessage": null,
+  "createdAt": "...",
+  "updatedAt": "...",
+  "queueLink": "http://localhost:20130/groups/grp_abc123/queue"
+}
+\`\`\`
+
+The queued item points to the backend-stored upload file. Keep the backend's upload directory intact until the queue item dispatches.
+
+## 2. Check when the queue will dispatch
+
+\`\`\`http
+GET /api/groups/{groupId}/next-upload-time
+\`\`\`
+
+## 3. List or remove queued files
+
+\`\`\`http
+GET /api/groups/{groupId}/queue
+DELETE /api/groups/{groupId}/queue/{itemId}
+\`\`\`
+
+When the scheduler dispatches the item, it creates normal post-jobs. Monitor those jobs with:
+
+\`\`\`http
+GET /api/post-jobs/{jobId}/events
+GET /api/post-jobs/{jobId}
+\`\`\`
 `,
   },
 ];

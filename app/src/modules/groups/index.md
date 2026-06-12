@@ -7,6 +7,8 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 ### Immediate upload
 `POST /api/groups/:id/upload` — download from 7router and immediately create post jobs for all destinations.
 
+`POST /api/groups/:id/upload-file` — accept a multipart `file` upload, store it on the backend, and immediately create post jobs for all destinations.
+
 **Body:**
 ```json
 {
@@ -19,6 +21,8 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 
 ### Queue an upload
 `POST /api/groups/:id/queue` — enqueue a 7router absolute path; dispatched at the group's daily upload time.
+
+`POST /api/groups/:id/queue-file` — accept a multipart `file` upload, store it on the backend, and enqueue it for scheduled dispatch.
 
 **Body:**
 ```json
