@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groupUploadSettings, groups } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupUploadSettings, groups } from "@/infrastructure/db/schema";
 import { DispatchNextQueuedGroupUploadUseCase } from "./dispatch-next-queued-group-upload.usecase";
 import {
   DEFAULT_UPLOAD_TIMES,

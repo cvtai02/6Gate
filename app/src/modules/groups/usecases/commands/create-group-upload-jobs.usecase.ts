@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
-import { createJob } from "@/server/jobs/job-service";
-import { startJobRunner } from "@/server/jobs/job-runner";
-import { getDestinationIconUrl } from "@/lib/destination-icons";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupDestinations, providers, destinations } from "@/infrastructure/db/schema";
+import { createJob } from "@/infrastructure/jobs/job-service";
+import { startJobRunner } from "@/infrastructure/jobs/job-runner";
+import { getDestinationIconUrl } from "@/core/destination-icons";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
 import { assertAbsolutePath, downloadFromStorage } from "../shared/storage-helper";
 

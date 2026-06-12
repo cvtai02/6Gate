@@ -1,7 +1,7 @@
-import { getDb } from "@/server/db";
-import { providers, accounts } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { providers, accounts } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
-import { getAdapter } from "@/server/providers/registry";
+import { getAdapter } from "@/infrastructure/providers/registry";
 
 export async function startOAuth(providerId: string): Promise<string> {
   const db = getDb();

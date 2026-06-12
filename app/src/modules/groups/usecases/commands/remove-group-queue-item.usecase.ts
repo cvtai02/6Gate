@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groupUploadQueue } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupUploadQueue } from "@/infrastructure/db/schema";
 import { ensureGroup } from "../shared/group-helpers";
 
 @Injectable()

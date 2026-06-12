@@ -1,8 +1,8 @@
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { destinations } from "@/infrastructure/db/schema";
 import { eq, and } from "drizzle-orm";
-import { DestinationType } from "@/lib/enums";
+import { DestinationType } from "@/core/enums";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const THREADS_GRAPH = "https://graph.threads.net/v1.0";

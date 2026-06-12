@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
-import { getDb } from "@/server/db";
-import { accounts, providers } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
 
 export class MockAdapter implements SocialProviderAdapter {

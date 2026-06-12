@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, postJobs, providers, destinations } from "@/server/db/schema";
-import { getDestinationIconUrl } from "@/lib/destination-icons";
+import { getDb } from "@/infrastructure/db";
+import { accounts, postJobs, providers, destinations } from "@/infrastructure/db/schema";
+import { getDestinationIconUrl } from "@/core/destination-icons";
 
 @Injectable()
 export class GetGroupHistoryUseCase {

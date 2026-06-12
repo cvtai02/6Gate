@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { destinations } from "@/server/db/schema";
-import { DestinationType } from "@/lib/enums";
+import { getDb } from "@/infrastructure/db";
+import { destinations } from "@/infrastructure/db/schema";
+import { DestinationType } from "@/core/enums";
 import {
   extractTelegramChats,
   getTelegramAccountOrThrow,

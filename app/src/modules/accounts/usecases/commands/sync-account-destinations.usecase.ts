@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, providers, destinations } from "@/server/db/schema";
-import { ProviderType } from "@/lib/enums";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers, destinations } from "@/infrastructure/db/schema";
+import { ProviderType } from "@/core/enums";
 import { SyncTelegramChatsUseCase } from "./sync-telegram-chats.usecase";
 import { SyncZernioUseCase } from "./sync-zernio.usecase";
 

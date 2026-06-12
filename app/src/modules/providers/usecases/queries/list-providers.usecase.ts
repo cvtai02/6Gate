@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { providers } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { providers } from "@/infrastructure/db/schema";
 
 @Injectable()
 export class ListProvidersUseCase {

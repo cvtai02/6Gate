@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { groupDestinations, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupDestinations, destinations } from "@/infrastructure/db/schema";
 import { ensureGroup } from "../shared/group-helpers";
 
 @Injectable()

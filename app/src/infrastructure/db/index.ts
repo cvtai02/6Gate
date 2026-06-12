@@ -5,10 +5,10 @@ let _pool: Pool | null = null;
 let _db: NodePgDatabase | null = null;
 
 function connectionString() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_CONNECTION_STRING ?? process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Provide a Postgres connection string, e.g. " +
+      "DATABASE_CONNECTION_STRING is not set. Provide a Postgres connection string, e.g. " +
         "postgresql://user:pass@host:5432/sixgate",
     );
   }
@@ -32,8 +32,7 @@ function sslConfig() {
 
 export function getPool() {
   if (_pool) return _pool;
-  // DATABASE_URL is read lazily (here) rather than at import time so the .env
-  // bootstrap loader in main.ts has already populated process.env.
+  // The connection string is read lazily so main.ts can load .env first.
   _pool = new Pool({ connectionString: connectionString(), ssl: sslConfig() });
   return _pool;
 }

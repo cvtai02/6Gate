@@ -10,13 +10,13 @@
  * so legacy/dropped columns (e.g. group_upload_queue.scheduled_at) are ignored.
  */
 import Database from "better-sqlite3";
-import { loadEnv } from "../src/server/db/load-env";
-import { env } from "../src/server/config/env";
+import { loadEnv } from "../src/infrastructure/db/load-env";
+import { env } from "../src/infrastructure/config/env";
 
 loadEnv();
 
-// Imported AFTER loadEnv() so getPool() reads DATABASE_URL / DATABASE_SSL.
-import { getPool, closeDb } from "../src/server/db/index";
+// Imported AFTER loadEnv() so getPool() reads DATABASE_CONNECTION_STRING / DATABASE_SSL.
+import { getPool, closeDb } from "../src/infrastructure/db/index";
 
 // Postgres tables to populate, with their primary-key column (for ON CONFLICT).
 // `source` is the SQLite table name when it differs from the Postgres name (e.g.
@@ -37,8 +37,8 @@ const TABLES: { name: string; pk: string; source?: string }[] = [
 ];
 
 async function main() {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) throw new Error("DATABASE_URL is not set");
+  const dbUrl = process.env.DATABASE_CONNECTION_STRING ?? process.env.DATABASE_URL;
+  if (!dbUrl) throw new Error("DATABASE_CONNECTION_STRING is not set");
 
   console.log(`[import] source SQLite : ${env.dbPath}`);
   console.log(`[import] target Postgres: ${dbUrl.replace(/:[^:@/]+@/, ":****@")}`);

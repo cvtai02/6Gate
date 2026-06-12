@@ -1,10 +1,10 @@
 import path from "path";
 import { eq } from "drizzle-orm";
 import type { PublishVideoInput, PublishVideoResult, SocialProviderAdapter } from "./types";
-import { getDb } from "@/server/db";
-import { accounts, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, destinations } from "@/infrastructure/db/schema";
 import { readVideoFile } from "./adapter-utils";
-import { appendLog } from "@/server/jobs/log-service";
+import { appendLog } from "@/infrastructure/jobs/log-service";
 
 type TelegramSendVideoResponse = {
   ok: boolean;

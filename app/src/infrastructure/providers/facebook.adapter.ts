@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import fs from "fs";
-import { getDb } from "@/server/db";
-import { accounts, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, destinations } from "@/infrastructure/db/schema";
 import { eq, and } from "drizzle-orm";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
 import {
@@ -10,10 +10,10 @@ import {
   getAccountRecord,
   checkHttpOk,
 } from "./adapter-utils";
-import { ProviderType, DestinationType, PublishStatus } from "@/lib/enums";
+import { ProviderType, DestinationType, PublishStatus } from "@/core/enums";
 import { syncInstagramForPage, syncThreadsForUser } from "./meta-ig-threads";
-import { appendLog } from "@/server/jobs/log-service";
-import { getJob } from "@/server/jobs/job-service";
+import { appendLog } from "@/infrastructure/jobs/log-service";
+import { getJob } from "@/infrastructure/jobs/job-service";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";

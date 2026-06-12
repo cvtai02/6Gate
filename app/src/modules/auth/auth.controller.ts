@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { env } from "@/server/config/env";
-import { signSession, verifySession } from "@/lib/jwt";
+import { env } from "@/infrastructure/config/env";
+import { signSession, verifySession } from "@/core/auth/jwt";
 
 @Controller("auth")
 export class AuthController {

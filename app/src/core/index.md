@@ -1,7 +1,11 @@
 # Core Layer
 
-Entities, enums, constants, policies, contracts, guards, and abstractions shared across modules.
+Entities, enums, constants, policies, contracts, guards, value objects, and helpers shared across modules.
 
-## Folders
+## Folders And Files
 
-- `guards/` - NestJS guards. `AuthGuard` protects mutating endpoints — validates JWT session (from UI) or `x-system-secret` header (direct API clients).
+- `auth/` - token signing and verification helpers.
+- `guards/` - NestJS guards. `AuthGuard` validates login-issued bearer tokens.
+- `security/` - encryption helpers for secret runtime settings.
+- `enums.ts` - shared backend enums used across modules and infrastructure.
+- `destination-icons.ts` - shared destination icon URL mapping.

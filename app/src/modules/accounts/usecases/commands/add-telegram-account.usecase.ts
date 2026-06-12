@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { accounts, providers } from "@/server/db/schema";
-import { ProviderType } from "@/lib/enums";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers } from "@/infrastructure/db/schema";
+import { ProviderType } from "@/core/enums";
 import type { AddTelegramAccountDto } from "../../dtos/add-telegram-account.dto";
 import { AddTelegramChatUseCase } from "./add-telegram-chat.usecase";
 import { telegramRequest, TelegramBotInfo } from "../shared/telegram-helpers";

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groupUploadSettings } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupUploadSettings } from "@/infrastructure/db/schema";
 import type { GroupUploadSettingsDto } from "../../dtos/group-upload-queue.dto";
 import type { UpdateGroupUploadSettingsDto } from "../../dtos/update-group-upload-settings.dto";
 import {

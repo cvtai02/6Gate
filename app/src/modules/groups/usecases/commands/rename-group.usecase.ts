@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groups } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groups } from "@/infrastructure/db/schema";
 import type { RenameGroupDto } from "../../dtos/rename-group.dto";
 
 @Injectable()

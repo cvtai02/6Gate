@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createZernioAccount } from "@/server/providers/zernio-service";
+import { createZernioAccount } from "@/infrastructure/providers/zernio-service";
 import type { AddZernioAccountDto } from "../../dtos/add-zernio-account.dto";
 
 @Injectable()

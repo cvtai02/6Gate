@@ -1,11 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, destinations } from "@/server/db/schema";
-import { ProviderType, PublishStatus } from "@/lib/enums";
-import { appendLog } from "@/server/jobs/log-service";
-import { getJob } from "@/server/jobs/job-service";
+import { getDb } from "@/infrastructure/db";
+import { accounts, destinations } from "@/infrastructure/db/schema";
+import { ProviderType, PublishStatus } from "@/core/enums";
+import { appendLog } from "@/infrastructure/jobs/log-service";
+import { getJob } from "@/infrastructure/jobs/job-service";
 import { getMimeType, getProviderRecord } from "./adapter-utils";
 import type { PublishVideoInput, PublishVideoResult, SocialProviderAdapter } from "./types";
 import { readZernioJson, zernioFetch, zernioPlatformForDestination } from "./zernio-service";

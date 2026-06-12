@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { requeueJob } from "@/server/jobs/job-service";
+import { requeueJob } from "@/infrastructure/jobs/job-service";
 import { StartJobRunnerUseCase } from "./start-job-runner.usecase";
 
 @Injectable()

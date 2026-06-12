@@ -1,26 +1,26 @@
-# 6Gate Deployment
+﻿# 6Gate Deployment
 
 **Architecture**
 
 ```
-  Browser ──▶ Vercel (Next.js UI, 6gate.minfect.com)
-                 │  rewrites /api/* and SSR fetches
-                 ▼
-            https://6gate-api.minfect.com   ──▶ nginx (TLS) ──▶ pm2 ▶ NestJS API :20130
-                                                                          │
-                                                                          ▼
+  Browser â”€â”€â–¶ Vercel (Next.js UI, 6gate.minfect.com)
+                 â”‚  rewrites /api/* and SSR fetches
+                 â–¼
+            https://6gate-api.minfect.com   â”€â”€â–¶ nginx (TLS) â”€â”€â–¶ pm2 â–¶ NestJS API :20130
+                                                                          â”‚
+                                                                          â–¼
                                               Postgres (postgre.minfect.com:5432/sixgate, SSL)
 ```
 
-- **API** → VPS, run by **pm2** behind your existing **nginx** + Let's Encrypt.
-- **UI** → **Vercel**, talks to the API via the `API_URL` env var.
+- **API** â†’ VPS, run by **pm2** behind your existing **nginx** + Let's Encrypt.
+- **UI** â†’ **Vercel**, talks to the API via the `API_BASE_URL` env var.
 
 ---
 
-## Part A — API on the VPS
+## Part A â€” API on the VPS
 
 ### 1. DNS
-Point an **A record** `6gate-api.minfect.com` → your VPS public IP. Verify:
+Point an **A record** `6gate-api.minfect.com` â†’ your VPS public IP. Verify:
 ```bash
 dig +short 6gate-api.minfect.com
 ```
@@ -33,10 +33,10 @@ Create `app/.env` (do **not** commit real secrets):
 ```ini
 SYSTEM_SECRET=<your-login-secret>
 ENCRYPTION_KEY=<your-encryption-key>
-DATABASE_URL=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
+DATABASE_CONNECTION_STRING=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
 DATABASE_SSL=require
 ```
-> - `SYSTEM_SECRET` is the login secret (and JWT / `x-system-secret` signer) — rotate freely.
+> - `SYSTEM_SECRET` is the login secret (and JWT) â€” rotate freely.
 > - `ENCRYPTION_KEY` is the AES key for sensitive values; it **must stay identical** to the
 >   original, or the storage token already migrated into Postgres won't decrypt.
 
@@ -51,17 +51,18 @@ pm2 start ecosystem.config.js
 pm2 save
 pm2 startup                  # run the command it prints, so the API survives reboots
 ```
-The API now listens on **127.0.0.1:20130** (and runs the Postgres migrations on boot —
+The API now listens on **127.0.0.1:20130** (and runs the Postgres migrations on boot â€”
 idempotent, safe). Check it:
 ```bash
 pm2 logs 6gate-api --lines 50
-curl -s -H "x-system-secret: $SYSTEM_SECRET" http://127.0.0.1:20130/api/providers | head -c 200
+TOKEN=$(curl -s -X POST http://127.0.0.1:20130/api/auth/login -H "Content-Type: application/json" -d "{\"secret\":\"$SYSTEM_SECRET\"}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:20130/api/providers | head -c 200
 ```
 
 > Firewall: only expose 80/443. Keep 20130 closed to the public (nginx reaches it on
 > localhost): `sudo ufw allow 'Nginx Full' && sudo ufw deny 20130`.
 
-### 4. nginx + TLS (Cloudflare Origin cert — no certbot)
+### 4. nginx + TLS (Cloudflare Origin cert â€” no certbot)
 TLS uses a shared **Cloudflare Origin Certificate** for `*.minfect.com`; the domain
 must be Cloudflare-proxied (orange cloud) with SSL mode **Full (strict)**. The host
 **must be a single-level subdomain** (`6gate-api.minfect.com`, not `api.6gate.minfect.com`)
@@ -71,7 +72,8 @@ so Cloudflare's free edge SSL (`*.minfect.com`) covers it. Full copy-paste CLI i
 
 Verify end-to-end (through Cloudflare):
 ```bash
-curl -s https://6gate-api.minfect.com/api/providers -H "x-system-secret: $SYSTEM_SECRET" | head -c 200
+TOKEN=$(curl -s -X POST https://6gate-api.minfect.com/api/auth/login -H "Content-Type: application/json" -d "{\"secret\":\"$SYSTEM_SECRET\"}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+curl -s https://6gate-api.minfect.com/api/providers -H "Authorization: Bearer $TOKEN" | head -c 200
 ```
 
 ### 5. Redeploying later
@@ -83,19 +85,19 @@ pm2 reload 6gate-api
 
 ---
 
-## Part B — UI on Vercel
+## Part B â€” UI on Vercel
 
-1. **Import** the repo in Vercel → **New Project**.
+1. **Import** the repo in Vercel â†’ **New Project**.
 2. **Root Directory**: `ui` (Vercel auto-detects Next.js).
    - Build/Install commands: leave default. The `@sixgate/api-client` dependency is now
      vendored at `ui/vendor/sixgate-api-client`, so `npm install` works on a clean clone.
 3. **Environment Variables** (Production + Preview):
    | Name | Value |
    |------|-------|
-   | `API_URL` | `https://6gate-api.minfect.com` |
-4. **Deploy.** Then add your UI domain (e.g. `6gate.minfect.com`) under Project → Domains.
+   | `API_BASE_URL` | `https://6gate-api.minfect.com` |
+4. **Deploy.** Then add your UI domain (e.g. `6gate.minfect.com`) under Project â†’ Domains.
 
-`API_URL` drives both the `/api/*` rewrite and server-side rendering fetches
+`API_BASE_URL` drives both the `/api/*` rewrite and server-side rendering fetches
 ([next.config.ts](../ui/next.config.ts), [api-client.ts](../ui/src/lib/api-client.ts),
 [proxy.ts](../ui/src/proxy.ts)). Log in with the `SYSTEM_SECRET` value.
 
@@ -107,7 +109,7 @@ pm2 reload 6gate-api
   and any large request body are proxied by Vercel when called as `/api/*` on the UI origin.
   Vercel imposes body-size and connection-duration limits that self-hosting doesn't. If you
   hit truncated uploads or dropped log streams, point those specific calls **directly** at
-  `https://6gate-api.minfect.com` from the browser — the API already sends permissive CORS
+  `https://6gate-api.minfect.com` from the browser â€” the API already sends permissive CORS
   (`origin: *`) in [main.ts](../app/src/main.ts), so cross-origin calls work.
 - **SYSTEM_SECRET parity.** Same value in the VPS `app/.env` and what users enter at login.
 - The `Dockerfile`s in `app/` and `ui/` are from the earlier Docker plan and are **not used**

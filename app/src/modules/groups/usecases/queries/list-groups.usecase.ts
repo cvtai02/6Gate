@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, groupDestinations, groups, providers, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupDestinations, groups, providers, destinations } from "@/infrastructure/db/schema";
 
 @Injectable()
 export class ListGroupsUseCase {

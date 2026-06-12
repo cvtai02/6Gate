@@ -1,4 +1,4 @@
-import "reflect-metadata";
+﻿import "reflect-metadata";
 import { randomBytes } from "crypto";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
@@ -16,10 +16,10 @@ try {
 } catch {}
 
 // Auto-generate secrets on first boot (replaces the "changeme" default).
-//   SYSTEM_SECRET  — auth: login + JWT signing + x-system-secret header
-//   ENCRYPTION_KEY — AES-256-GCM key for sensitive values stored in the DB
+//   SYSTEM_SECRET  â€” auth: login + JWT signing
+//   ENCRYPTION_KEY â€” AES-256-GCM key for sensitive values stored in the DB
 // A regenerated ENCRYPTION_KEY can't decrypt existing data, so this only ever
-// fills in a missing/placeholder key on a fresh install — it never rotates one.
+// fills in a missing/placeholder key on a fresh install â€” it never rotates one.
 for (const name of ["SYSTEM_SECRET", "ENCRYPTION_KEY"]) {
   if (process.env[name] && process.env[name] !== "changeme") continue;
   const secret = randomBytes(32).toString("hex");
@@ -39,10 +39,10 @@ for (const name of ["SYSTEM_SECRET", "ENCRYPTION_KEY"]) {
 import { NestFactory } from "@nestjs/core";
 import { json, urlencoded } from "express";
 import { AppModule } from "./app.module";
-import { env } from "@/server/config/env";
-import { getDb } from "@/server/db";
-import { runMigrations } from "@/server/db/migrate";
-import { settings } from "@/server/db/schema";
+import { env } from "@/infrastructure/config/env";
+import { getDb } from "@/infrastructure/db";
+import { runMigrations } from "@/infrastructure/db/migrate";
+import { settings } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
 
 async function readPort() {

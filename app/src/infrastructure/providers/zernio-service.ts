@@ -1,8 +1,8 @@
 import { nanoid } from "nanoid";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
-import { DestinationType, ProviderType } from "@/lib/enums";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupDestinations, providers, destinations } from "@/infrastructure/db/schema";
+import { DestinationType, ProviderType } from "@/core/enums";
 
 export const ZERNIO_DEFAULT_BASE_URL = "https://zernio.com/api/v1";
 export const ZERNIO_DOCS_URL = "https://docs.zernio.com/llms-full.txt";

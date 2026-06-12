@@ -1,8 +1,8 @@
 import { nanoid } from "nanoid";
 import fs from "fs";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts } from "@/infrastructure/db/schema";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
 import {
   REDIRECT_URI,
@@ -12,8 +12,8 @@ import {
   checkHttpOk,
   createDestinationForAccount,
 } from "./adapter-utils";
-import { ProviderType } from "@/lib/enums";
-import { appendLog } from "@/server/jobs/log-service";
+import { ProviderType } from "@/core/enums";
+import { appendLog } from "@/infrastructure/jobs/log-service";
 
 /** YouTube requires chunk sizes to be a multiple of 256 KB except for the final chunk. */
 const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB — Google's recommended minimum

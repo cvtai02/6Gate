@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, groupDestinations, jobLogs, postJobs, providers, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupDestinations, jobLogs, postJobs, providers, destinations } from "@/infrastructure/db/schema";
 import { getProviderOrThrow } from "../shared/provider-helpers";
 
 @Injectable()

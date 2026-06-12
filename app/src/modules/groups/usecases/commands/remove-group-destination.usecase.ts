@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groupDestinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupDestinations } from "@/infrastructure/db/schema";
 
 @Injectable()
 export class RemoveGroupDestinationUseCase {

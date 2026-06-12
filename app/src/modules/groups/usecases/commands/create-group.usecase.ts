@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { groupUploadSettings, groups } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupUploadSettings, groups } from "@/infrastructure/db/schema";
 import type { CreateGroupDto } from "../../dtos/create-group.dto";
 import { DEFAULT_UPLOAD_TIMES, toSnakeCaseId } from "../shared/group-helpers";
 

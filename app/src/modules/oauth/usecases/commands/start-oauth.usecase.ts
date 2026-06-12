@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { startOAuth } from "@/server/auth/oauth-service";
+import { startOAuth } from "@/infrastructure/auth/oauth-service";
 
 @Injectable()
 export class StartOauthUseCase {

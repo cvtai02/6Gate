@@ -1,9 +1,9 @@
 import fs from "fs";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { providers, accounts, destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { providers, accounts, destinations } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
-import { ProviderType, DestinationType } from "@/lib/enums";
+import { ProviderType, DestinationType } from "@/core/enums";
 
 const DESTINATION_TYPE: Record<string, DestinationType> = {
   [ProviderType.youtube]: DestinationType.youtube_channel,

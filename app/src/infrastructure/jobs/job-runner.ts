@@ -1,10 +1,10 @@
-import { getDb } from "@/server/db";
-import { accounts, groupUploadQueue, postJobs, providers } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupUploadQueue, postJobs, providers } from "@/infrastructure/db/schema";
 import { and, eq } from "drizzle-orm";
-import { getAdapter } from "@/server/providers/registry";
+import { getAdapter } from "@/infrastructure/providers/registry";
 import { appendLog, emitStatus } from "./log-service";
 import { getJob, updateJobStatus } from "./job-service";
-import { PublishStatus } from "@/lib/enums";
+import { PublishStatus } from "@/core/enums";
 import fs from "fs";
 
 // NOTE: This runner is the legacy one-shot loop. The resilient-job rewrite (state machine

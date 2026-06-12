@@ -1,9 +1,9 @@
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { accounts, postJobs, providers } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, postJobs, providers } from "@/infrastructure/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
-import { PublishStatus, ContentType } from "@/lib/enums";
+import { PublishStatus, ContentType } from "@/core/enums";
 import fs from "fs";
 import { appendLog, emitStatus } from "./log-service";
 

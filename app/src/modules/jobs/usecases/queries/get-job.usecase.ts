@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { getJob } from "@/server/jobs/job-service";
+import { getJob } from "@/infrastructure/jobs/job-service";
 
 @Injectable()
 export class GetJobUseCase {

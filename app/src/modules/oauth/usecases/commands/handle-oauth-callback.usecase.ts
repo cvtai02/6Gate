@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, providers } from "@/server/db/schema";
-import { handleCallback } from "@/server/auth/oauth-service";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers } from "@/infrastructure/db/schema";
+import { handleCallback } from "@/infrastructure/auth/oauth-service";
 import type { OauthCallbackDto } from "../../dtos/oauth-callback.dto";
 
 @Injectable()

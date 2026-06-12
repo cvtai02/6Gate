@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, providers } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers } from "@/infrastructure/db/schema";
 import type { AccountFiltersDto } from "../../dtos/account-filters.dto";
 
 @Injectable()

@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { getDb } from "@/server/db";
-import { router7 } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { router7 } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
-import { env } from "@/server/config/env";
-import { encryptValue } from "@/lib/crypto";
+import { env } from "@/infrastructure/config/env";
+import { encryptValue } from "@/core/security/crypto";
 import type { StorageDto } from "../queries/list-storage.usecase";
 
 @Injectable()

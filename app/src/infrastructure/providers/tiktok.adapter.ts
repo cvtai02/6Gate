@@ -1,8 +1,8 @@
 import { nanoid } from "nanoid";
 import { randomBytes, createHash } from "crypto";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, providers as providersTable } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers as providersTable } from "@/infrastructure/db/schema";
 import type { SocialProviderAdapter, PublishVideoInput, PublishVideoResult } from "./types";
 import CryptoJS from "crypto-js";
 import {
@@ -13,7 +13,7 @@ import {
   checkHttpOk,
   createDestinationForAccount,
 } from "./adapter-utils";
-import { ProviderType, TIKTOK_SCOPES } from "@/lib/enums";
+import { ProviderType, TIKTOK_SCOPES } from "@/core/enums";
 
 const AUTH_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/";

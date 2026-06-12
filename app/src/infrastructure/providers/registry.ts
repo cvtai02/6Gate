@@ -4,7 +4,7 @@ import { TikTokAdapter } from "./tiktok.adapter";
 import { FacebookAdapter } from "./facebook.adapter";
 import { ZernioAdapter } from "./zernio.adapter";
 import { TelegramAdapter } from "./telegram.adapter";
-import { ProviderType } from "@/lib/enums";
+import { ProviderType } from "@/core/enums";
 
 const adapters = new Map<string, SocialProviderAdapter>();
 

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { createJob } from "@/server/jobs/job-service";
+import { createJob } from "@/infrastructure/jobs/job-service";
 import type { CreateJobDto } from "../../dtos/create-job.dto";
 
 @Injectable()

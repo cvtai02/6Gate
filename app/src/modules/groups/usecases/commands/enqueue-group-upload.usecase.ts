@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { groupUploadQueue } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { groupUploadQueue } from "@/infrastructure/db/schema";
 import type { EnqueueGroupUploadDto } from "../../dtos/enqueue-group-upload.dto";
 import type { GroupUploadQueueItemDto } from "../../dtos/group-upload-queue.dto";
 import { ensureGroup, QUEUE_STATUS_PENDING } from "../shared/group-helpers";

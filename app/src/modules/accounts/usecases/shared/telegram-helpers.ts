@@ -1,9 +1,9 @@
 import { NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { accounts, groupDestinations, providers, destinations } from "@/server/db/schema";
-import { DestinationType, ProviderType } from "@/lib/enums";
+import { getDb } from "@/infrastructure/db";
+import { accounts, groupDestinations, providers, destinations } from "@/infrastructure/db/schema";
+import { DestinationType, ProviderType } from "@/core/enums";
 
 type TelegramApiResponse<T> = {
   ok: boolean;

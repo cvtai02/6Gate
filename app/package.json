@@ -6,7 +6,7 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
-    "db:migrate": "ts-node -r tsconfig-paths/register src/server/db/run-migrations.ts",
+    "db:migrate": "ts-node -r tsconfig-paths/register src/infrastructure/db/run-migrations.ts",
     "db:import-sqlite": "ts-node -r tsconfig-paths/register scripts/migrate-sqlite-to-pg.ts",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest --passWithNoTests"

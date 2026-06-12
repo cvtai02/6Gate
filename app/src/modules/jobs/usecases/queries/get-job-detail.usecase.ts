@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/server/db";
-import { accounts, providers, destinations } from "@/server/db/schema";
-import { getJob } from "@/server/jobs/job-service";
-import { getJobLogs } from "@/server/jobs/log-service";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers, destinations } from "@/infrastructure/db/schema";
+import { getJob } from "@/infrastructure/jobs/job-service";
+import { getJobLogs } from "@/infrastructure/jobs/log-service";
 
 @Injectable()
 export class GetJobDetailUseCase {

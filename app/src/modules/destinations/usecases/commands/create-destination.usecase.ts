@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { destinations } from "@/server/db/schema";
+import { getDb } from "@/infrastructure/db";
+import { destinations } from "@/infrastructure/db/schema";
 import type { CreateDestinationDto } from "../../dtos/create-destination.dto";
 
 @Injectable()

@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import { startJobRunner } from "@/server/jobs/job-runner";
+import { startJobRunner } from "@/infrastructure/jobs/job-runner";
 
 @Injectable()
 export class StartJobRunnerUseCase implements OnModuleInit {

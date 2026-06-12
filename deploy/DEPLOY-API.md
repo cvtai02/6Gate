@@ -1,7 +1,7 @@
-# Deploy the 6Gate API to the VPS (pm2 + nginx + Cloudflare Origin TLS)
+﻿# Deploy the 6Gate API to the VPS (pm2 + nginx + Cloudflare Origin TLS)
 
 Copy-paste CLI. Run on the **VPS** unless noted. TLS uses a **Cloudflare Origin
-Certificate** (no certbot) — the domain must be Cloudflare-proxied (orange cloud)
+Certificate** (no certbot) â€” the domain must be Cloudflare-proxied (orange cloud)
 with SSL/TLS mode **Full (strict)**.
 
 > Replace placeholders: `<REPO_URL>`, `<VPS_IP>`, and the secrets in step 3.
@@ -9,10 +9,10 @@ with SSL/TLS mode **Full (strict)**.
 ---
 
 ## 0. Cloudflare DNS (dashboard or API, one-time)
-- Add an **A record**: `6gate-api` → `<VPS_IP>`, **Proxy status: Proxied** (orange cloud).
+- Add an **A record**: `6gate-api` â†’ `<VPS_IP>`, **Proxy status: Proxied** (orange cloud).
   Single-level subdomain so Cloudflare's free `*.minfect.com` SSL covers the edge cert.
-- SSL/TLS → Overview → set mode to **Full (strict)**.
-- SSL/TLS → **Origin Server** → **Create Certificate** with hostnames `minfect.com`
+- SSL/TLS â†’ Overview â†’ set mode to **Full (strict)**.
+- SSL/TLS â†’ **Origin Server** â†’ **Create Certificate** with hostnames `minfect.com`
   and `*.minfect.com` (the wildcard covers `6gate-api.minfect.com` and every other
   app on this box). Save it once on the VPS as a **shared** cert:
   ```bash
@@ -21,7 +21,7 @@ with SSL/TLS mode **Full (strict)**.
   sudo tee /etc/nginx/ssl/minfect.com.key >/dev/null   # paste Private Key, Ctrl-D
   sudo chmod 600 /etc/nginx/ssl/minfect.com.key
   ```
-  The nginx conf points `ssl_certificate` at this shared file — if it already exists
+  The nginx conf points `ssl_certificate` at this shared file â€” if it already exists
   (other sites use it), skip this.
 
 Verify DNS resolves (Cloudflare IP is expected, since it's proxied):
@@ -39,19 +39,19 @@ node -v || curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && 
 sudo npm i -g pm2
 ```
 
-## 3. Secrets — create app/.env
+## 3. Secrets â€” create app/.env
 ```bash
 cat > ~/6gate/app/.env <<'EOF'
 SYSTEM_SECRET=<your-login-secret>
 ENCRYPTION_KEY=<your-encryption-key>
-DATABASE_URL=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
+DATABASE_CONNECTION_STRING=postgresql://minfect:<db-password>@postgre.minfect.com:5432/sixgate
 DATABASE_SSL=require
 EOF
 chmod 600 ~/6gate/app/.env
 ```
-> - `SYSTEM_SECRET` — what you log in with (also signs JWT sessions and the
->   `x-system-secret` header). Rotate it freely; it only invalidates sessions.
-> - `ENCRYPTION_KEY` — **must equal the original value** used when the storage token
+> - `SYSTEM_SECRET` is what you log in with and what signs JWT sessions.
+>   Rotate it freely; it only invalidates sessions.
+> - `ENCRYPTION_KEY` â€” **must equal the original value** used when the storage token
 >   was encrypted, or the migrated Postgres token won't decrypt. Don't rotate it.
 
 ## 4. Build + start with pm2
@@ -68,7 +68,8 @@ Smoke-test locally (the API listens on 127.0.0.1:20130):
 ```bash
 pm2 logs 6gate-api --lines 30
 SECRET=$(grep SYSTEM_SECRET ~/6gate/app/.env | cut -d= -f2)
-curl -s -H "x-system-secret: $SECRET" http://127.0.0.1:20130/api/providers | head -c 200; echo
+TOKEN=$(curl -s -X POST http://127.0.0.1:20130/api/auth/login -H "Content-Type: application/json" -d "{\"secret\":\"$SECRET\"}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:20130/api/providers | head -c 200; echo
 ```
 
 ## 6. nginx site
@@ -89,7 +90,8 @@ sudo ufw deny 20130 2>/dev/null || true
 ## 8. Verify end-to-end (through Cloudflare)
 ```bash
 SECRET=$(grep SYSTEM_SECRET ~/6gate/app/.env | cut -d= -f2)
-curl -s https://6gate-api.minfect.com/api/providers -H "x-system-secret: $SECRET" | head -c 200; echo
+TOKEN=$(curl -s -X POST https://6gate-api.minfect.com/api/auth/login -H "Content-Type: application/json" -d "{\"secret\":\"$SECRET\"}" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).token))")
+curl -s https://6gate-api.minfect.com/api/providers -H "Authorization: Bearer $TOKEN" | head -c 200; echo
 ```
 Expect a JSON array of providers.
 
@@ -102,22 +104,22 @@ npm ci && npm run build
 pm2 reload 6gate-api
 ```
 
-## Continuous deploy (GitHub Actions → SSH, password auth)
+## Continuous deploy (GitHub Actions â†’ SSH, password auth)
 On every push to `main` that touches `app/**`, a GitHub-hosted runner SSHes into the VPS
 (`sshpass` password auth) and runs [deploy/remote-deploy.sh](remote-deploy.sh)
-(pull → build → `pm2 reload`). See
+(pull â†’ build â†’ `pm2 reload`). See
 [.github/workflows/deploy-api.yml](../.github/workflows/deploy-api.yml). `app/.env` is
 gitignored, so the pull never touches it.
 
 **One-time setup:**
 
-1. Make sure the VPS allows password SSH for this user — in `/etc/ssh/sshd_config`:
+1. Make sure the VPS allows password SSH for this user â€” in `/etc/ssh/sshd_config`:
    ```
    PasswordAuthentication yes
    PermitRootLogin yes        # only if deploying as root
    ```
    then `sudo systemctl restart ssh`.
-2. GitHub → repo **Settings → Secrets and variables → Actions → New repository secret**:
+2. GitHub â†’ repo **Settings â†’ Secrets and variables â†’ Actions â†’ New repository secret**:
    | Secret | Value |
    |--------|-------|
    | `VPS_HOST` | your VPS IP (e.g. `116.118.9.84`) |
@@ -128,7 +130,7 @@ gitignored, so the pull never touches it.
 3. `node`/`npm`/`pm2` resolution in a non-interactive SSH shell is handled by
    `remote-deploy.sh` (adds `/usr/local/bin` + sources nvm if present).
 
-**Test it:** push any change under `app/` → **Actions** tab → "Deploy API (SSH)" runs and
+**Test it:** push any change under `app/` â†’ **Actions** tab â†’ "Deploy API (SSH)" runs and
 the API reloads.
 
 > Security: password auth + root is the weakest option (brute-forceable, password lives
@@ -136,7 +138,7 @@ the API reloads.
 > password if it's ever exposed.
 
 ## Notes
-- **1 pm2 instance only** (set in `ecosystem.config.js`) — the job runner + SSE keep
+- **1 pm2 instance only** (set in `ecosystem.config.js`) â€” the job runner + SSE keep
   in-memory state; cluster mode would break live logs and duplicate the dispatcher.
 - **Cloudflare upload cap**: 100 MB per request on Free/Pro. Video uploads larger than
   that won't pass through the proxied hostname. If needed, add a second **DNS-only**

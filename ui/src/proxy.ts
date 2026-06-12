@@ -12,7 +12,7 @@ export async function proxy(req: NextRequest) {
       headers: {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-System-Secret",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
         "Access-Control-Max-Age": "86400",
       },
     });

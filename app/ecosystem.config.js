@@ -1,4 +1,4 @@
-// pm2 process definition for the 6Gate API.
+﻿// pm2 process definition for the 6Gate API.
 //
 //   pm2 start ecosystem.config.js
 //   pm2 save                       # persist across reboots (after `pm2 startup`)
@@ -16,7 +16,7 @@ module.exports = {
       exec_mode: "fork",
       autorestart: true,
       max_memory_restart: "512M",
-      // The app loads app/.env itself (DATABASE_URL, DATABASE_SSL, SYSTEM_SECRET).
+      // The app loads app/.env itself (DATABASE_CONNECTION_STRING, DATABASE_SSL, SYSTEM_SECRET).
       // Set NODE_ENV here; secrets stay in .env, never in this committed file.
       env: {
         NODE_ENV: "production",

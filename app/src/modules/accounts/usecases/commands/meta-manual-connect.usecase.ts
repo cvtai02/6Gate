@@ -1,10 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { getDb } from "@/server/db";
-import { accounts, providers, destinations } from "@/server/db/schema";
-import { DestinationType } from "@/lib/enums";
-import { syncInstagramForPage, syncThreadsForUser } from "@/server/providers/meta-ig-threads";
+import { getDb } from "@/infrastructure/db";
+import { accounts, providers, destinations } from "@/infrastructure/db/schema";
+import { DestinationType } from "@/core/enums";
+import { syncInstagramForPage, syncThreadsForUser } from "@/infrastructure/providers/meta-ig-threads";
 import type { MetaManualConnectDto } from "../../dtos/meta-manual-connect.dto";
 
 @Injectable()

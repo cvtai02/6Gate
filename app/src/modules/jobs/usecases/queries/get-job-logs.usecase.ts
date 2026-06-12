@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { getJobLogs } from "@/server/jobs/log-service";
+import { getJobLogs } from "@/infrastructure/jobs/log-service";
 
 @Injectable()
 export class GetJobLogsUseCase {

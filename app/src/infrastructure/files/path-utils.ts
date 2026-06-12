@@ -1,5 +1,5 @@
 import fs from "fs";
-import { env } from "@/server/config/env";
+import { env } from "@/infrastructure/config/env";
 
 export function ensureDataDirs() {
   fs.mkdirSync(env.uploadsDir, { recursive: true });
