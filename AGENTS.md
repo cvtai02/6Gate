@@ -11,6 +11,5 @@ Key requirements:
 - Keep external integrations and adapters in `app/src/infrastructure/`.
 - Do not add repository layers over Drizzle.
 - Use login-issued bearer tokens for protected API calls.
-- Do not add cookie sessions, token query strings, or raw system-secret API bypasses.
 - Create handoffs for backend/UI contract changes according to `handoffs/rules.md`.
 - Run a smoke test before finishing a change.

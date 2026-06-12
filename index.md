@@ -10,5 +10,3 @@ Root index for the strict split project.
 - `AGENTS.md` - Root instructions for AI agents.
 - `CLAUDE.md` - Root instructions for Claude.
 - `rules.md` - Root project rules.
-
-`agents-instructions.md` remains as a compatibility pointer to `AGENTS.md`.

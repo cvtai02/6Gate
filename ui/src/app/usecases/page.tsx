@@ -10,16 +10,16 @@ const BASE_URL_PROD = "https://6gate-api.minfect.com";
 const USE_CASES: { key: UseCaseKey; title: string; subtitle: string; markdown: string }[] = [
   {
     key: "path",
-    title: "Upload immediately to a group",
-    subtitle: "Post a local file path — jobs start immediately, one per destination",
-    markdown: `# 6Gate API instructions: upload to a group
+    title: "Immediate upload from storage path",
+    subtitle: "Send a 7router file path; the API downloads it and starts jobs",
+    markdown: `# 6Gate API instructions: immediate upload from storage path
 
-Use this when an agent has an absolute video file path on the same machine that runs 6Gate. The upload starts immediately — jobs are created and dispatched as soon as you call the endpoint.
+Use this when the video already exists in connected storage and the client can provide a 7router absolute file path. This path-based flow sends JSON only; it does not upload file bytes in the request.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
 
-## 1. Enqueue the group upload
+## 1. Create jobs from a storage path
 
 \`\`\`http
 POST /api/groups/{groupId}/upload
@@ -28,7 +28,7 @@ Content-Type: application/json
 
 \`\`\`json
 {
-  "videoPath": "C:/Users/you/Videos/clip.mp4",
+  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
   "title": "Optional title",
   "caption": "Optional caption or description",
   "privacy": "public"
@@ -36,7 +36,7 @@ Content-Type: application/json
 \`\`\`
 
 Fields:
-- \`videoPath\`: required absolute path readable by the 6Gate server process.
+- \`absolutePath\`: required 7router absolute path to a single video file.
 - \`title\`: optional.
 - \`caption\`: optional.
 - \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
@@ -61,7 +61,7 @@ Successful response:
 }
 \`\`\`
 
-Each job uploads to one destination. Keep the source file in place until all jobs finish.
+Each job uploads to one destination. Keep the source file in storage until the backend has downloaded it.
 
 ## 3. Monitor each job with its own stream
 
@@ -115,11 +115,11 @@ POST /api/post-jobs/{jobId}/cancel
   },
   {
     key: "file",
-    title: "Upload a file stream immediately",
-    subtitle: "Send multipart/form-data; the API stores the file and starts jobs immediately",
-    markdown: `# 6Gate API instructions: upload a file stream to a group
+    title: "Immediate upload from file",
+    subtitle: "Send multipart file bytes; no storage path or directory needed",
+    markdown: `# 6Gate API instructions: immediate upload from file
 
-Use this when the client has the video bytes, not a server-readable path or a 7router path. The request uploads the file as \`multipart/form-data\`; the API streams it to backend storage, then immediately creates one post job per destination.
+Use this when the client has the actual video file bytes. This file-based flow sends \`multipart/form-data\`; it does not require a 7router path, a server-readable path, or a directory.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
@@ -172,7 +172,7 @@ Successful response:
 }
 \`\`\`
 
-The backend keeps the uploaded file until all destination jobs have finished reading it.
+The backend stores the uploaded file and keeps it available until all destination jobs have finished reading it.
 
 ## 2. Monitor each job
 
@@ -192,11 +192,11 @@ Terminal statuses are \`Published\`, \`Failed\`, and \`Cancelled\`.
   },
   {
     key: "queue",
-    title: "Schedule uploads with a group queue",
-    subtitle: "Enqueue videos and let the scheduler dispatch one per day",
-    markdown: `# 6Gate API instructions: schedule uploads with a group queue
+    title: "Scheduled upload from storage path",
+    subtitle: "Queue a 7router file path for later scheduler dispatch",
+    markdown: `# 6Gate API instructions: scheduled upload from storage path
 
-Each group has a built-in upload queue. Add items to it and the scheduler automatically dispatches the oldest pending item once per day at the group's configured time.
+Use this when the video already exists in connected storage and the client can provide a 7router absolute file path. This path-based queue flow sends JSON only; the scheduler downloads the file later when the queue item dispatches.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
@@ -222,7 +222,7 @@ Response:
 - If \`nextUploadAt\` is in the past, the scheduler will dispatch within 30 seconds.
 - The upload time is configured by a moderator via \`PATCH /api/groups/{groupId}/queue-settings\`.
 
-## 2. Add an item to the queue
+## 2. Add a storage-path item to the queue
 
 \`\`\`http
 POST /api/groups/{groupId}/queue
@@ -231,7 +231,7 @@ Content-Type: application/json
 
 \`\`\`json
 {
-  "storagePath": "CloudflareR2/account/bucket/videos/clip.mp4",
+  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
   "title": "Optional title",
   "caption": "Optional caption or description",
   "privacy": "public"
@@ -239,7 +239,7 @@ Content-Type: application/json
 \`\`\`
 
 Fields:
-- \`storagePath\`: required. 7router absolute path to the video in cloud storage.
+- \`absolutePath\`: required 7router absolute path to a single video file.
 - \`title\`, \`caption\`, \`privacy\`: optional metadata passed through to the upload job.
 
 Response (201):
@@ -248,7 +248,7 @@ Response (201):
 {
   "id": "gqueue_Kp2mNx4qRs",
   "groupId": "grp_abc123",
-  "videoPath": "CloudflareR2/account/bucket/videos/clip.mp4",
+  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
   "title": null,
   "caption": null,
   "privacy": "public",
@@ -297,16 +297,16 @@ Terminal statuses: \`Published\`, \`Failed\`, \`Cancelled\`.
   },
   {
     key: "queueFile",
-    title: "Schedule an uploaded file",
-    subtitle: "Upload multipart/form-data now; dispatch it later from the group queue",
-    markdown: `# 6Gate API instructions: schedule an uploaded file with a group queue
+    title: "Scheduled upload from file",
+    subtitle: "Upload multipart file bytes now and dispatch them later",
+    markdown: `# 6Gate API instructions: scheduled upload from file
 
-Use this when the client has a video file and wants 6Gate to store it now, then publish it later at the group's configured queue time. This is the file-upload version of the 7router queue flow.
+Use this when the client has the actual video file bytes and wants 6Gate to store them now, then publish later at the group's configured queue time. This file-based queue flow does not require a 7router path, a server-readable path, or a directory.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
 
-## 1. Add an uploaded file to the queue
+## 1. Upload a file into the queue
 
 \`\`\`http
 POST /api/groups/{groupId}/queue-file
@@ -352,7 +352,7 @@ Response (201):
 }
 \`\`\`
 
-The queued item points to the backend-stored upload file. Keep the backend's upload directory intact until the queue item dispatches.
+The queued item points to the backend-stored upload file. Keep the backend upload directory intact until the queue item dispatches.
 
 ## 2. Check when the queue will dispatch
 
