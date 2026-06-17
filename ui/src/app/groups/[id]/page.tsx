@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { getDestinationIconPath } from "@/lib/destination-icons";
+import { TYPE_COLORS, TYPE_ABBR, TYPE_LABEL } from "@/lib/destination-types";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -36,6 +38,20 @@ type PublishDestination = {
   accountAvatarUrl: string | null;
 };
 
+type QueueItem = {
+  id: string;
+  groupId: string;
+  videoPath: string;
+  title: string | null;
+  caption: string | null;
+  privacy: string | null;
+  status: string;
+  uploadBatchId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type JobResult = {
   id: string;
   destinationId: string;
@@ -50,33 +66,6 @@ type JobResult = {
 };
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
-
-const TYPE_COLORS: Record<string, string> = {
-  youtube_channel: "bg-red-600",
-  facebook_page: "bg-blue-700",
-  tiktok_account: "bg-gray-800",
-  instagram_account: "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-400",
-  threads_profile: "bg-black",
-  TelegramChat: "bg-sky-500",
-};
-
-const TYPE_ABBR: Record<string, string> = {
-  youtube_channel: "YT",
-  facebook_page: "FB",
-  tiktok_account: "TK",
-  instagram_account: "IG",
-  threads_profile: "TH",
-  TelegramChat: "TG",
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  youtube_channel: "YouTube",
-  facebook_page: "Facebook",
-  tiktok_account: "TikTok",
-  instagram_account: "Instagram",
-  threads_profile: "Threads",
-  TelegramChat: "Telegram",
-};
 
 const TYPE_ORDER = ["youtube_channel", "facebook_page", "instagram_account", "threads_profile", "tiktok_account", "TelegramChat"];
 
@@ -110,6 +99,12 @@ const JOB_STATUS_BORDER: Record<string, string> = {
   Cancelled: "border-white/10 bg-white/[.03]",
 };
 
+const QUEUE_STATUS_META: Record<string, { dot: string; text: string }> = {
+  Pending: { dot: "bg-yellow-400", text: "text-yellow-400" },
+  Dispatched: { dot: "bg-green-400", text: "text-green-400" },
+  Failed: { dot: "bg-red-400", text: "text-red-400" },
+};
+
 /* ── Visual helpers ─────────────────────────────────────────────────────── */
 
 function DestBadge({ type, providerType }: { type: string; providerType?: string | null }) {
@@ -130,80 +125,20 @@ function DestBadge({ type, providerType }: { type: string; providerType?: string
   );
 }
 
-function DestAvatar({ type, avatarUrl, providerType }: { type: string; avatarUrl?: string | null; providerType?: string | null }) {
+function DestAvatar({ type, avatarUrl, providerType, size = 8 }: { type: string; avatarUrl?: string | null; providerType?: string | null; size?: number }) {
   const [errored, setErrored] = useState(false);
+  const cls = `w-${size} h-${size} rounded-lg object-cover shrink-0`;
   if (avatarUrl && !errored) {
-    return (
-      <img
-        src={avatarUrl}
-        alt=""
-        className="w-8 h-8 rounded-lg object-cover shrink-0"
-        onError={() => setErrored(true)}
-      />
-    );
+    return <img src={avatarUrl} alt="" className={cls} onError={() => setErrored(true)} />;
   }
   return <DestBadge type={type} providerType={providerType} />;
 }
 
-function Tooltip({ children, content, className = "" }: { children: React.ReactNode; content: React.ReactNode; className?: string }) {
-  return (
-    <span className={`relative group inline-flex items-center ${className}`}>
-      {children}
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-56 rounded-lg bg-gray-900 border border-gray-700 px-3 py-2.5 text-xs text-gray-300 leading-relaxed shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-normal">
-        {content}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-700" />
-      </span>
-    </span>
-  );
-}
-
-function PrivacyRadios({ privacy, setPrivacy }: { privacy: string; setPrivacy: (v: "public" | "private" | "unlisted") => void }) {
-  return (
-    <div className="flex gap-2">
-      {(["public", "unlisted", "private"] as const).map((val) => {
-        const tooltip =
-          val === "public" ? (
-            <span>
-              <strong className="text-white block mb-1">Public</strong>
-              <span className="text-gray-400 block">YouTube</span> Visible to everyone, searchable.
-              <span className="text-gray-400 block mt-1">TikTok</span> Visible to everyone on the For You feed.
-              <span className="text-gray-400 block mt-1">Facebook</span> Visible to everyone.
-            </span>
-          ) : val === "unlisted" ? (
-            <span>
-              <strong className="text-white block mb-1">Unlisted</strong>
-              <span className="text-gray-400 block">YouTube</span> Only people with the link can watch.
-              <span className="text-gray-400 block mt-1">TikTok</span> Not supported — falls back to Private.
-              <span className="text-gray-400 block mt-1">Facebook</span> Not supported — falls back to Public.
-            </span>
-          ) : (
-            <span>
-              <strong className="text-white block mb-1">Private</strong>
-              Only you can see it on all platforms.
-            </span>
-          );
-
-        const inner = (
-          <label
-            key={val}
-            className={`w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border cursor-pointer text-xs font-medium transition-colors ${
-              privacy === val
-                ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                : "border-[var(--border)] text-gray-500 hover:border-gray-500 hover:text-gray-300"
-            }`}
-          >
-            <input type="radio" name="privacy" value={val} checked={privacy === val} onChange={() => setPrivacy(val)} className="sr-only" />
-            {val.charAt(0).toUpperCase() + val.slice(1)}
-            <svg className="w-3 h-3 opacity-50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
-            </svg>
-          </label>
-        );
-
-        return <Tooltip key={val} content={tooltip} className="flex-1">{inner}</Tooltip>;
-      })}
-    </div>
-  );
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 /* ── Add Destination Modal ──────────────────────────────────────────────── */
@@ -252,7 +187,7 @@ function AddDestinationModal({
       <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-3xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-sm font-semibold text-white">Add Destination</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
         </div>
 
         {available.length === 0 ? (
@@ -287,7 +222,7 @@ function AddDestinationModal({
                         )}
                       </div>
                       {adding === dest.id ? (
-                        <span className="text-xs text-gray-500 shrink-0">Adding…</span>
+                        <span className="text-xs text-gray-500 shrink-0">Adding...</span>
                       ) : (
                         <span className="text-xs text-indigo-500 shrink-0">+</span>
                       )}
@@ -312,24 +247,21 @@ function AddDestinationModal({
   );
 }
 
-/* ── Upload panel ───────────────────────────────────────────────────────── */
+/* ── Job Progress Panel ────────────────────────────────────────────────── */
 
-function UploadPanel({ groupId, groupName }: { groupId: string; groupName: string }) {
-  const [storagePath, setStoragePath] = useState("");
-  const [title, setTitle] = useState("");
-  const [caption, setCaption] = useState("");
-  const [privacy, setPrivacy] = useState<"public" | "private" | "unlisted">("public");
-  const [uploading, setUploading] = useState(false);
-  const [jobs, setJobs] = useState<JobResult[] | null>(null);
-  const [error, setError] = useState("");
+function JobProgressPanel({ jobs, onReset }: { jobs: JobResult[]; onReset: () => void }) {
+  const [liveJobs, setLiveJobs] = useState(jobs);
 
   useEffect(() => {
-    if (!jobs) return;
-    const pending = jobs.filter((j) => (ACTIVE as readonly string[]).includes(j.status));
+    setLiveJobs(jobs);
+  }, [jobs]);
+
+  useEffect(() => {
+    const pending = liveJobs.filter((j) => (ACTIVE as readonly string[]).includes(j.status));
     if (pending.length === 0) return;
     const id = setInterval(async () => {
       const updated = await Promise.all(
-        jobs.map(async (j) => {
+        liveJobs.map(async (j) => {
           if ((TERMINAL as readonly string[]).includes(j.status) || j.status === "ReconnectRequired") return j;
           try {
             const res = await fetch(`/api/post-jobs/${j.id}`);
@@ -339,183 +271,656 @@ function UploadPanel({ groupId, groupName }: { groupId: string; groupName: strin
           } catch { return j; }
         })
       );
-      setJobs(updated);
+      setLiveJobs(updated);
     }, 2000);
     return () => clearInterval(id);
-  }, [jobs]);
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    if (!storagePath.trim()) return;
-    setUploading(true);
-    setError("");
-
-    try {
-      const res = await fetch(`/api/groups/${groupId}/upload`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          storagePath: storagePath.trim(),
-          title: title.trim() || undefined,
-          caption: caption.trim() || undefined,
-          privacy,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Upload failed");
-      } else {
-        setJobs(
-          (data.jobs ?? []).map((j: { id: string; destinationId: string; destinationName: string; platform: string }) => ({
-            ...j,
-            status: "Created" as const,
-          }))
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
+  }, [liveJobs]);
 
   async function cancelJob(jobId: string) {
     try {
       await fetch(`/api/post-jobs/${jobId}/cancel`, { method: "POST" });
-      setJobs((cur) => cur?.map((j) => j.id === jobId ? { ...j, status: "Cancelled" as const } : j) ?? null);
+      setLiveJobs((cur) => cur.map((j) => j.id === jobId ? { ...j, status: "Cancelled" as const } : j));
     } catch { /* ignore */ }
   }
 
+  const doneCount = liveJobs.filter((j) => (TERMINAL as readonly string[]).includes(j.status) || j.status === "ReconnectRequired").length;
+  const allDone = doneCount === liveJobs.length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{doneCount} / {liveJobs.length} done</span>
+          {!allDone && (
+            <span className="flex items-center gap-1.5 text-xs text-indigo-400">
+              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Processing...
+            </span>
+          )}
+        </div>
+        {allDone && (
+          <button onClick={onReset} className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 px-3 py-1 rounded-lg transition-colors">
+            Schedule another
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {liveJobs.map((j) => (
+          <div key={j.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${JOB_STATUS_BORDER[j.status] ?? "border-white/10"}`}>
+            <span className={`text-xs shrink-0 ${JOB_STATUS_COLOR[j.status]}`}>
+              {j.status === "Published" ? "ok" : j.status === "Failed" || j.status === "Cancelled" ? "x" : j.status === "ReconnectRequired" ? "!" : "..."}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white truncate">{j.destinationName}</p>
+              {j.providerPostUrl && (
+                <a href={j.providerPostUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline truncate block">View post</a>
+              )}
+              {j.errorMessage && <p className="text-xs text-red-400 truncate">{j.errorMessage}</p>}
+            </div>
+            <span className={`text-[10px] capitalize shrink-0 ${JOB_STATUS_COLOR[j.status]}`}>{j.status}</span>
+            {(CANCELLABLE as readonly string[]).includes(j.status) && (
+              <button onClick={() => cancelJob(j.id)} className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded border border-red-500/30 hover:border-red-400/50 transition-colors shrink-0">
+                Cancel
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Schedule Video Form ───────────────────────────────────────────────── */
+
+type InputMode = "file" | "url" | "storagePath";
+
+function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
+  groupId: string;
+  hasDestinations: boolean;
+  onQueued: () => void;
+  onUploaded: (jobs: JobResult[]) => void;
+}) {
+  const [inputMode, setInputMode] = useState<InputMode>("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [storagePath, setStoragePath] = useState("");
+  const [title, setTitle] = useState("");
+  const [caption, setCaption] = useState("");
+  const [privacy, setPrivacy] = useState<"public" | "private" | "unlisted">("public");
+  const [submitting, setSubmitting] = useState<"queue" | "upload" | null>(null);
+  const [error, setError] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const hasInput = inputMode === "file" ? !!file : inputMode === "url" ? videoUrl.trim() : storagePath.trim();
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped?.type.startsWith("video/")) {
+      setFile(dropped);
+      setInputMode("file");
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = e.target.files?.[0];
+    if (selected) { setFile(selected); setInputMode("file"); }
+  }
+
+  function buildFormData(): FormData {
+    const fd = new FormData();
+    fd.append("file", file!);
+    if (title.trim()) fd.append("title", title.trim());
+    if (caption.trim()) fd.append("caption", caption.trim());
+    fd.append("privacy", privacy);
+    return fd;
+  }
+
+  function buildJsonBody(): string {
+    const body: Record<string, string | undefined> = {
+      title: title.trim() || undefined,
+      caption: caption.trim() || undefined,
+      privacy,
+    };
+    if (inputMode === "url") body.videoUrl = videoUrl.trim();
+    else body.absolutePath = storagePath.trim();
+    return JSON.stringify(body);
+  }
+
+  async function submitWithXhr(url: string, fd: FormData): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        setUploadProgress(null);
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 400) reject(new Error(data.error ?? `HTTP ${xhr.status}`));
+          else resolve(data);
+        } catch { reject(new Error(`HTTP ${xhr.status}`)); }
+      };
+      xhr.onerror = () => { setUploadProgress(null); reject(new Error("Network error")); };
+      xhr.send(fd);
+    });
+  }
+
+  async function handleQueue(e: React.FormEvent) {
+    e.preventDefault();
+    if (!hasInput) return;
+    setSubmitting("queue");
+    setError("");
+    try {
+      if (inputMode === "file") {
+        await submitWithXhr(`/api/groups/${groupId}/queue-file`, buildFormData());
+      } else {
+        const res = await fetch(`/api/groups/${groupId}/queue`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: buildJsonBody(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed");
+      }
+      reset();
+      onQueued();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add to queue");
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function handleUploadNow(e: React.FormEvent) {
+    e.preventDefault();
+    if (!hasInput) return;
+    setSubmitting("upload");
+    setError("");
+    try {
+      let data: Record<string, unknown>;
+      if (inputMode === "file") {
+        data = (await submitWithXhr(`/api/groups/${groupId}/upload-file`, buildFormData())) as Record<string, unknown>;
+      } else {
+        const res = await fetch(`/api/groups/${groupId}/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: buildJsonBody(),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error((data as { error?: string }).error ?? "Failed");
+      }
+      const jobs = ((data.jobs ?? []) as { id: string; destinationId: string; destinationName: string; platform: string }[]).map((j) => ({
+        ...j,
+        status: "Created" as const,
+      }));
+      onUploaded(jobs);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
   function reset() {
-    setJobs(null);
+    setFile(null);
+    setVideoUrl("");
     setStoragePath("");
     setTitle("");
     setCaption("");
     setPrivacy("public");
     setError("");
+    setUploadProgress(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  const doneCount = jobs?.filter((j) => (TERMINAL as readonly string[]).includes(j.status) || j.status === "ReconnectRequired").length ?? 0;
-  const allDone = jobs ? doneCount === jobs.length : false;
-
-  if (jobs) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">{doneCount} / {jobs.length} done</span>
-            {!allDone && (
-              <span className="flex items-center gap-1.5 text-xs text-indigo-400">
-                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Processing…
-              </span>
-            )}
-          </div>
-          {allDone && (
-            <button
-              onClick={reset}
-              className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 px-3 py-1 rounded-lg transition-colors"
-            >
-              Upload another
-            </button>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          {jobs.map((j) => (
-            <div key={j.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${JOB_STATUS_BORDER[j.status] ?? "border-white/10"}`}>
-              <span className={`text-xs mt-0.5 shrink-0 ${JOB_STATUS_COLOR[j.status]}`}>
-                {j.status === "Published" ? "✓" : j.status === "Failed" || j.status === "Cancelled" ? "✕" : j.status === "ReconnectRequired" ? "⚠" : "·"}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-white truncate">{j.destinationName}</p>
-                  <span className={`text-[10px] capitalize shrink-0 ${JOB_STATUS_COLOR[j.status]}`}>
-                    {j.status}
-                  </span>
-                </div>
-                {j.providerPostUrl && (
-                  <a href={j.providerPostUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-400 hover:underline truncate block">
-                    View post →
-                  </a>
-                )}
-                {j.errorMessage && <p className="text-xs text-red-400 truncate">{j.errorMessage}</p>}
-              </div>
-              {(CANCELLABLE as readonly string[]).includes(j.status) && (
-                <button
-                  type="button"
-                  onClick={() => cancelJob(j.id)}
-                  className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded-md border border-red-500/30 hover:border-red-400/50 transition-colors shrink-0"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const modeLabels: { mode: InputMode; label: string }[] = [
+    { mode: "file", label: "File" },
+    { mode: "url", label: "CDN URL" },
+    { mode: "storagePath", label: "Storage Path" },
+  ];
 
   return (
-    <form onSubmit={handleUpload} className="space-y-4">
+    <div className="space-y-5">
       {error && (
         <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      <div>
-        <label className="block text-xs text-gray-400 mb-1.5">Storage Path</label>
-        <input
-          required
-          value={storagePath}
-          onChange={(e) => setStoragePath(e.target.value)}
-          placeholder="CloudflareR2/account/bucket/videos/clip.mp4"
-          className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
-        />
-        <p className="text-[11px] text-gray-600 mt-1">7router absolute path to the video file in cloud storage.</p>
+      {/* Input mode tabs */}
+      <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+        {modeLabels.map(({ mode, label }) => (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setInputMode(mode)}
+            className={`flex-1 py-2 text-xs font-medium transition-colors ${
+              inputMode === mode
+                ? "bg-indigo-500/20 text-indigo-300"
+                : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+            } ${mode !== "file" ? "border-l border-[var(--border)]" : ""}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* File input zone */}
+      {inputMode === "file" && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all ${
+            dragOver
+              ? "border-indigo-500 bg-indigo-500/10"
+              : file
+              ? "border-green-500/40 bg-green-500/5"
+              : "border-[var(--border)] hover:border-gray-500 bg-black/20"
+          } ${file ? "px-4 py-3" : "px-4 py-8"}`}
+        >
+          <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
+          {file ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white truncate">{file.name}</p>
+                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                className="text-gray-500 hover:text-red-400 text-xs px-2 py-1 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="text-center">
+              <svg className="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-sm text-gray-400">Drop a video file here or <span className="text-indigo-400">browse</span></p>
+              <p className="text-xs text-gray-600 mt-1">MP4, MOV, AVI, MKV, WebM</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CDN URL input */}
+      {inputMode === "url" && (
+        <div>
+          <label className="block text-xs text-gray-400 mb-1.5">Video URL</label>
+          <input
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="https://cdn.example.com/videos/clip.mp4"
+            className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
+          />
+          <p className="text-[11px] text-gray-600 mt-1">Direct link to a video file hosted on a CDN or any public URL.</p>
+        </div>
+      )}
+
+      {/* Storage path input */}
+      {inputMode === "storagePath" && (
+        <div>
+          <label className="block text-xs text-gray-400 mb-1.5">Storage Path</label>
+          <input
+            value={storagePath}
+            onChange={(e) => setStoragePath(e.target.value)}
+            placeholder="CloudflareR2/account/bucket/videos/clip.mp4"
+            className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
+          />
+          <p className="text-[11px] text-gray-600 mt-1">7router absolute path to the video file in cloud storage.</p>
+        </div>
+      )}
+
+      {/* Upload progress bar */}
+      {uploadProgress !== null && (
+        <div className="space-y-1">
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+          </div>
+          <p className="text-xs text-gray-500 text-right">{uploadProgress}%</p>
+        </div>
+      )}
+
+      {/* Metadata fields */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1.5">Title <span className="text-gray-600">(optional)</span></label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Video title"
+            className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1.5">Privacy</label>
+          <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+            {(["public", "unlisted", "private"] as const).map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setPrivacy(val)}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  privacy === val
+                    ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                } ${val !== "public" ? "border-l border-[var(--border)]" : ""}`}
+              >
+                {val.charAt(0).toUpperCase() + val.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div>
-        <label className="block text-xs text-gray-400 mb-1.5">
-          Title <span className="text-gray-600">(optional)</span>
-        </label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Video title"
-          className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-        />
-      </div>
-
-      <div>
-        <label className="block text-xs text-gray-400 mb-1.5">
-          Caption <span className="text-gray-600">(optional)</span>
-        </label>
+        <label className="block text-xs text-gray-400 mb-1.5">Caption <span className="text-gray-600">(optional)</span></label>
         <textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          placeholder="Write a caption…"
-          rows={3}
+          placeholder="Write a caption..."
+          rows={2}
           className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors resize-none"
         />
       </div>
 
-      <div>
-        <label className="block text-xs text-gray-400 mb-1.5">Privacy</label>
-        <PrivacyRadios privacy={privacy} setPrivacy={setPrivacy} />
+      {/* Action buttons */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={!hasInput || !hasDestinations || !!submitting}
+          onClick={handleQueue}
+          className="flex-1 py-2.5 text-sm font-medium border border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10 rounded-lg disabled:opacity-40 transition-colors"
+        >
+          {submitting === "queue" ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              Adding...
+            </span>
+          ) : "Add to Queue"}
+        </button>
+        <button
+          type="button"
+          disabled={!hasInput || !hasDestinations || !!submitting}
+          onClick={handleUploadNow}
+          className="flex-1 py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-40 transition-colors"
+        >
+          {submitting === "upload" ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" /><path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              Uploading...
+            </span>
+          ) : "Upload Now"}
+        </button>
       </div>
 
-      <button
-        type="submit"
-        disabled={!storagePath.trim() || uploading}
-        className="w-full py-2.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
-      >
-        {uploading ? "Uploading…" : "Upload Now"}
-      </button>
-    </form>
+      {!hasDestinations && (
+        <p className="text-xs text-amber-400/80 text-center">Add destinations to this group before scheduling.</p>
+      )}
+    </div>
+  );
+}
+
+/* ── Notification Channels ──────────────────────────────────────────────── */
+
+type NotificationChannel = {
+  id: string;
+  accountId: string;
+  chatId: string;
+  chatName: string | null;
+  botName: string | null;
+  providerType: string;
+};
+
+type TelegramChat = {
+  id: string;
+  name: string;
+  externalId: string | null;
+  socialAccountId: string;
+};
+
+function AddNotificationChannelModal({
+  groupId,
+  telegramBots,
+  onClose,
+  onAdded,
+}: {
+  groupId: string;
+  telegramBots: { id: string; displayName: string | null; username: string | null }[];
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [botId, setBotId] = useState(telegramBots[0]?.id ?? "");
+  const [chats, setChats] = useState<TelegramChat[]>([]);
+  const [selectedChat, setSelectedChat] = useState("");
+  const [loadingChats, setLoadingChats] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!botId) { setChats([]); return; }
+    setLoadingChats(true);
+    setSelectedChat("");
+    fetch(`/api/publish-destinations?type=telegram`)
+      .then((r) => r.json())
+      .then((all: TelegramChat[]) => {
+        const botChats = all.filter((d) => d.socialAccountId === botId);
+        setChats(botChats);
+        if (botChats.length > 0) setSelectedChat(botChats[0].externalId ?? botChats[0].id);
+      })
+      .finally(() => setLoadingChats(false));
+  }, [botId]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!botId || !selectedChat) return;
+    setSaving(true);
+    setError("");
+    const chat = chats.find((c) => (c.externalId ?? c.id) === selectedChat);
+    const res = await fetch(`/api/groups/${groupId}/notification-channels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: botId, chatId: selectedChat, chatName: chat?.name || undefined }),
+    });
+    if (res.ok) {
+      onAdded();
+      onClose();
+    } else {
+      const d = await res.json();
+      setError(d.error ?? "Failed to add");
+    }
+    setSaving(false);
+  }
+
+  async function handleSyncChats() {
+    if (!botId) return;
+    setLoadingChats(true);
+    setError("");
+    try {
+      const syncRes = await fetch(`/api/accounts/${botId}/sync`, { method: "POST" });
+      const syncData = await syncRes.json();
+      if (!syncRes.ok) {
+        setError(syncData.message ?? syncData.error ?? "Sync failed");
+      }
+      const all: TelegramChat[] = await fetch(`/api/publish-destinations?type=telegram`).then((r) => r.json());
+      const botChats = all.filter((d) => d.socialAccountId === botId);
+      setChats(botChats);
+      if (botChats.length > 0 && !selectedChat) setSelectedChat(botChats[0].externalId ?? botChats[0].id);
+    } finally {
+      setLoadingChats(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+          <h2 className="text-sm font-semibold text-white">Add Notification Channel</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
+          )}
+          {telegramBots.length === 0 ? (
+            <p className="text-sm text-gray-500">No Telegram bots configured. Add one in <a href="/providers/telegram" className="text-indigo-400 hover:text-indigo-300">Providers → Telegram</a> first.</p>
+          ) : (
+            <>
+              <div>
+                <label className="text-[11px] text-gray-500 mb-1 block">Bot</label>
+                <select
+                  value={botId}
+                  onChange={(e) => setBotId(e.target.value)}
+                  className="w-full text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-white"
+                >
+                  {telegramBots.map((bot) => (
+                    <option key={bot.id} value={bot.id}>
+                      {bot.displayName || bot.username || bot.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] text-gray-500">Channel / Group</label>
+                  <button
+                    type="button"
+                    onClick={handleSyncChats}
+                    disabled={loadingChats}
+                    className="text-[11px] text-sky-400 hover:text-sky-300 disabled:opacity-50"
+                  >
+                    {loadingChats ? "Syncing…" : "Sync chats"}
+                  </button>
+                </div>
+                {loadingChats ? (
+                  <div className="w-full text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-gray-500">
+                    Loading…
+                  </div>
+                ) : chats.length === 0 ? (
+                  <div className="w-full text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-gray-500">
+                    No chats found — click "Sync chats" to discover groups the bot can access.
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={selectedChat}
+                    onChange={(e) => setSelectedChat(e.target.value)}
+                    className="w-full text-sm bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-white"
+                  >
+                    {chats.map((chat) => (
+                      <option key={chat.id} value={chat.externalId ?? chat.id}>
+                        {chat.name} ({chat.externalId ?? chat.id})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving || !selectedChat} className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors">
+                  {saving ? "Adding…" : "Add"}
+                </button>
+              </div>
+            </>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function NotificationChannelsCard({
+  groupId,
+  channels,
+  telegramBots,
+  onChanged,
+}: {
+  groupId: string;
+  channels: NotificationChannel[];
+  telegramBots: { id: string; displayName: string | null; username: string | null }[];
+  onChanged: () => void;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+
+  async function removeChannel(channelId: string) {
+    await fetch(`/api/groups/${groupId}/notification-channels/${channelId}`, { method: "DELETE" });
+    onChanged();
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
+      {showAdd && (
+        <AddNotificationChannelModal
+          groupId={groupId}
+          telegramBots={telegramBots}
+          onClose={() => setShowAdd(false)}
+          onAdded={() => { setShowAdd(false); onChanged(); }}
+        />
+      )}
+      <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Notifications</h3>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+        >
+          + Add
+        </button>
+      </div>
+      {channels.length === 0 ? (
+        <div className="p-4 text-center">
+          <p className="text-xs text-gray-500">No notification channels</p>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 mt-2 transition-colors"
+          >
+            + Add Channel
+          </button>
+        </div>
+      ) : (
+        <div className="p-2 space-y-0.5">
+          {channels.map((ch) => (
+            <div key={ch.id} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[.03] group/notif">
+              <div className="w-8 h-8 rounded-full bg-sky-600/30 border border-sky-500/30 flex items-center justify-center shrink-0">
+                <img className="w-4 h-4" src="/icons/telegram.svg" alt="" aria-hidden="true" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white truncate">{ch.chatName || ch.chatId}</p>
+                <p className="text-[11px] text-gray-600">
+                  {ch.botName ?? "Bot"} · {ch.chatName ? ch.chatId : "Telegram"}
+                </p>
+              </div>
+              <button
+                onClick={() => removeChannel(ch.id)}
+                className="text-[11px] text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover/notif:opacity-100 shrink-0"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -525,47 +930,79 @@ export default function GroupOverviewPage() {
   const { id } = useParams<{ id: string }>();
   const [group, setGroup] = useState<Group | null>(null);
   const [allDestinations, setAllDestinations] = useState<PublishDestination[]>([]);
+  const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
+  const [nextUploadAt, setNextUploadAt] = useState<string | null>(null);
+  const [uploadTimesInDay, setUploadTimesInDay] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [jobs, setJobs] = useState<JobResult[] | null>(null);
+  const [notificationChannels, setNotificationChannels] = useState<NotificationChannel[]>([]);
+  const [telegramBots, setTelegramBots] = useState<{ id: string; displayName: string | null; username: string | null }[]>([]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [groupRes, destRes] = await Promise.all([
+    const [groupRes, destRes, queueRes, settingsRes, nextRes, ncRes, accountsRes] = await Promise.all([
       fetch("/api/groups"),
       fetch("/api/publish-destinations"),
+      fetch(`/api/groups/${id}/queue`),
+      fetch(`/api/groups/${id}/queue-settings`),
+      fetch(`/api/groups/${id}/next-upload-time`),
+      fetch(`/api/groups/${id}/notification-channels`),
+      fetch("/api/accounts"),
     ]);
     const groups: Group[] = await groupRes.json();
-    const g = groups.find((g) => g.id === id) ?? null;
-    setGroup(g);
+    setGroup(groups.find((g) => g.id === id) ?? null);
     setAllDestinations(await destRes.json());
+    if (queueRes.ok) setQueueItems(await queueRes.json());
+    if (settingsRes.ok) {
+      const s = await settingsRes.json();
+      setUploadTimesInDay(s.uploadTimesInDay ?? []);
+    }
+    if (nextRes.ok) {
+      const n = await nextRes.json();
+      setNextUploadAt(n.nextUploadAt ?? null);
+    }
+    if (ncRes.ok) setNotificationChannels(await ncRes.json());
+    if (accountsRes.ok) {
+      const allAccounts: { id: string; displayName: string | null; username: string | null; providerType: string }[] = await accountsRes.json();
+      setTelegramBots(allAccounts.filter((a) => a.providerType === "telegram"));
+    }
     setLoading(false);
-  }
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   async function removeDestination(destinationId: string) {
     await fetch(`/api/groups/${id}/destinations/${destinationId}`, { method: "DELETE" });
     await load();
   }
 
+  async function removeQueueItem(itemId: string) {
+    await fetch(`/api/groups/${id}/queue/${itemId}`, { method: "DELETE" });
+    setQueueItems((prev) => prev.filter((x) => x.id !== itemId));
+  }
+
   if (loading) {
     return (
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 animate-pulse">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-64" />
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-64" />
+      <div className="p-8 animate-pulse space-y-4">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-80" />
+        <div className="grid grid-cols-3 gap-4">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-20" />
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-20" />
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] h-20" />
+        </div>
       </div>
     );
   }
 
   if (!group) {
     return (
-      <div className="p-8">
-        <p className="text-sm text-gray-500">Group not found.</p>
-      </div>
+      <div className="p-8"><p className="text-sm text-gray-500">Group not found.</p></div>
     );
   }
 
   const existingIds = new Set(group.destinations.map((d) => d.destinationId));
+  const pendingItems = queueItems.filter((x) => x.status === "Pending");
 
   return (
     <>
@@ -579,76 +1016,158 @@ export default function GroupOverviewPage() {
         />
       )}
 
-      <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Left: Destinations */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Destinations</h2>
-              <p className="text-xs text-gray-500 mt-0.5">{group.destinations.length} platform{group.destinations.length !== 1 ? "s" : ""}</p>
+      <div className="p-8 space-y-6 max-w-5xl">
+        {/* Main content: 2-column */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+          {/* Left: Schedule form */}
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
+            <div className="px-5 py-4 border-b border-[var(--border)]">
+              <h2 className="text-sm font-semibold text-white">Schedule a Video</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Upload a file or enter a storage path, then queue or publish immediately</p>
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              + Add
-            </button>
+            <div className="p-5">
+              {jobs ? (
+                <JobProgressPanel jobs={jobs} onReset={() => { setJobs(null); load(); }} />
+              ) : (
+                <ScheduleVideoForm
+                  groupId={group.id}
+                  hasDestinations={group.destinations.length > 0}
+                  onQueued={load}
+                  onUploaded={(j) => setJobs(j)}
+                />
+              )}
+            </div>
           </div>
 
-          <div className="p-3 space-y-2">
-            {group.destinations.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-sm text-gray-500">No destinations yet</p>
-                <p className="text-xs text-gray-600 mt-1">Add destinations to broadcast to multiple platforms</p>
+          {/* Right sidebar */}
+          <div className="space-y-4">
+            {/* Destinations */}
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Destinations</h3>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="mt-4 text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-500/60 px-4 py-2 rounded-lg transition-colors"
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
                 >
-                  + Add Destination
+                  + Add
                 </button>
               </div>
-            ) : (
-              group.destinations.map((dest) => {
-                const type = dest.type ?? "";
-                return (
-                  <div
-                    key={dest.destinationId}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-black/20"
+              {group.destinations.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-xs text-gray-500">No destinations</p>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 mt-2 transition-colors"
                   >
-                    <DestAvatar type={type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} providerType={dest.providerType} />
+                    + Add Destination
+                  </button>
+                </div>
+              ) : (
+                <div className="p-2 space-y-0.5">
+                  {group.destinations.map((dest) => {
+                    const type = dest.type ?? "";
+                    return (
+                      <div key={dest.destinationId} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/[.03] group/dest">
+                        <DestAvatar type={type} avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl} providerType={dest.providerType} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{dest.name}</p>
+                          <p className="text-[11px] text-gray-600">{TYPE_LABEL[type] ?? type}</p>
+                        </div>
+                        <button
+                          onClick={() => removeDestination(dest.destinationId)}
+                          className="text-[11px] text-gray-700 hover:text-red-400 transition-colors opacity-0 group-hover/dest:opacity-100 shrink-0"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Schedule info */}
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Schedule</h3>
+                <Link
+                  href={`/groups/${id}/settings`}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Edit
+                </Link>
+              </div>
+              <div className="p-4 space-y-3">
+                <div>
+                  <p className="text-[11px] text-gray-500 mb-1">Daily upload times</p>
+                  <p className="text-sm text-white">
+                    {uploadTimesInDay.length > 0 ? [...uploadTimesInDay].sort().join("  ·  ") : "Not configured"}
+                  </p>
+                </div>
+                {nextUploadAt && (
+                  <div>
+                    <p className="text-[11px] text-gray-500 mb-1">Next dispatch</p>
+                    <p className="text-sm text-white">{new Date(nextUploadAt).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Notification Channels */}
+            <NotificationChannelsCard
+              groupId={id}
+              channels={notificationChannels}
+              telegramBots={telegramBots}
+              onChanged={load}
+            />
+          </div>
+        </div>
+
+        {/* Pending Queue */}
+        {pendingItems.length > 0 && (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
+            <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Queue</h3>
+                <span className="text-[11px] text-gray-500">{pendingItems.length} pending</span>
+              </div>
+              <Link
+                href={`/groups/${id}/queue`}
+                className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+              >
+                View all
+              </Link>
+            </div>
+            <div className="divide-y divide-[var(--border)]">
+              {pendingItems.slice(0, 5).map((item) => {
+                const meta = QUEUE_STATUS_META[item.status] ?? { dot: "bg-gray-400", text: "text-gray-400" };
+                return (
+                  <div key={item.id} className="flex items-center gap-3 px-5 py-3">
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${meta.dot}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white truncate">{dest.name}</p>
-                      <p className="text-xs text-gray-500">{TYPE_LABEL[type] ?? type}</p>
+                      <p className="text-sm text-white truncate">{item.title || item.videoPath.split("/").pop()}</p>
+                      <p className="text-[11px] text-gray-600 truncate">{item.videoPath}</p>
                     </div>
+                    <span className="text-[11px] text-gray-600 shrink-0">{new Date(item.createdAt).toLocaleDateString()}</span>
                     <button
-                      onClick={() => removeDestination(dest.destinationId)}
-                      className="text-xs text-gray-600 hover:text-red-400 transition-colors shrink-0 px-2 py-1"
-                      title="Remove from group"
+                      onClick={() => removeQueueItem(item.id)}
+                      className="text-[11px] text-gray-600 hover:text-red-400 transition-colors shrink-0"
                     >
-                      ✕
+                      &times;
                     </button>
                   </div>
                 );
-              })
-            )}
+              })}
+              {pendingItems.length > 5 && (
+                <div className="px-5 py-2">
+                  <Link href={`/groups/${id}/queue`} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                    +{pendingItems.length - 5} more...
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* Right: Upload */}
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-sm font-semibold text-white">Upload</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Publish immediately or schedule to all destinations</p>
-          </div>
-
-          <div className="p-5">
-            {group.destinations.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-6">Add destinations before uploading.</p>
-            ) : (
-              <UploadPanel groupId={group.id} groupName={group.name} />
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </>
   );

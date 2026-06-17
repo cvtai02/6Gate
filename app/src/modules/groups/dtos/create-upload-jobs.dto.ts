@@ -1,5 +1,6 @@
 export interface CreateUploadJobsDto {
-  absolutePath: string;
+  absolutePath?: string;
+  videoUrl?: string;
   title?: string;
   caption?: string;
   privacy?: string;

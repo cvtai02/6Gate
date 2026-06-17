@@ -113,6 +113,15 @@ export const groups = pgTable("combos", {
   createdAt: text("created_at").notNull(),
 });
 
+export const groupNotificationChannels = pgTable("group_notification_channels", {
+  id: text("id").primaryKey(),
+  groupId: text("group_id").notNull(),
+  accountId: text("account_id").notNull(),
+  chatId: text("chat_id").notNull(),
+  chatName: text("chat_name"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const destinations = pgTable("destinations", {
   id: text("id").primaryKey(),
   socialAccountId: text("social_account_id").notNull(),

@@ -87,12 +87,6 @@ function ZernioIcon({ className }: { className?: string }) {
   );
 }
 
-function TelegramIcon({ className }: { className?: string }) {
-  return (
-    <img className={className} src="/icons/telegram.svg" alt="" aria-hidden="true" />
-  );
-}
-
 const PROVIDER_META: Record<string, ProviderMeta> = {
   youtube: {
     label: "YouTube",
@@ -146,19 +140,6 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     ],
     Icon: ZernioIcon,
   },
-  telegram: {
-    label: "Telegram",
-
-    defaultScopes: "",
-    devConsole: "https://core.telegram.org/bots",
-    devConsoleLabel: "Telegram Bot API",
-    notes: [
-      "Create a bot with BotFather and copy the bot token.",
-      "Add the bot to the target group or channel with posting permission.",
-      "Add each chat as an account using its chat ID or public @username.",
-    ],
-    Icon: TelegramIcon,
-  },
 };
 
 const ICON_COLORS: Record<string, string> = {
@@ -166,8 +147,67 @@ const ICON_COLORS: Record<string, string> = {
   tiktok: "bg-gray-900",
   meta: "bg-white/10",
   zernio: "bg-transparent",
-  telegram: "bg-sky-500",
 };
+
+/* ── Notification adapter metadata ─────────────────────────────────────── */
+
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <img className={className} src="/icons/telegram.svg" alt="" aria-hidden="true" />
+  );
+}
+
+type NotificationAdapterMeta = {
+  label: string;
+  description: string;
+  href: string;
+  Icon: React.FC<{ className?: string }>;
+  iconBg: string;
+};
+
+const NOTIFICATION_ADAPTERS: NotificationAdapterMeta[] = [
+  {
+    label: "Telegram",
+    description: "Send upload notifications to Telegram chats",
+    href: "/providers/telegram",
+    Icon: TelegramIcon,
+    iconBg: "bg-sky-500",
+  },
+];
+
+function NotificationAdapterCard({
+  meta,
+  count,
+  onClick,
+}: {
+  meta: NotificationAdapterMeta;
+  count: number;
+  onClick: () => void;
+}) {
+  const { Icon, label, description, iconBg } = meta;
+  return (
+    <button
+      onClick={onClick}
+      className="group rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4 flex items-center gap-3 hover:border-indigo-500/50 hover:bg-white/5 transition-all text-left w-full"
+    >
+      <div className={`w-10 h-10 rounded-lg ${iconBg} flex items-center justify-center shrink-0 overflow-hidden`}>
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-white">{label}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+        {count > 0 ? (
+          <p className="text-xs text-green-400 flex items-center gap-1 mt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+            {count} bot{count !== 1 ? "s" : ""} connected
+          </p>
+        ) : (
+          <p className="text-xs text-gray-600 mt-1">Not configured</p>
+        )}
+      </div>
+    </button>
+  );
+}
 
 const OAUTH_CALLBACK_PATH = "/api/accounts/oauth/callback";
 
@@ -513,6 +553,23 @@ export default function ProvidersPage() {
               type={type}
               count={connectedCountByType(type)}
               onClick={handleCardClick}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Notification section */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          Notification
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {NOTIFICATION_ADAPTERS.map((meta) => (
+            <NotificationAdapterCard
+              key={meta.label}
+              meta={meta}
+              count={connectedCountByType("telegram")}
+              onClick={() => router.push(meta.href)}
             />
           ))}
         </div>

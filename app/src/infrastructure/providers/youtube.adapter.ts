@@ -11,9 +11,10 @@ import {
   getMimeType,
   checkHttpOk,
   createDestinationForAccount,
+  statWithRetry,
 } from "./adapter-utils";
 import { ProviderType } from "@/core/enums";
-import { appendLog } from "@/infrastructure/jobs/log-service";
+import { adapterLog } from "./adapter-utils";
 
 /** YouTube requires chunk sizes to be a multiple of 256 KB except for the final chunk. */
 const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB — Google's recommended minimum
@@ -163,9 +164,9 @@ export class YouTubeAdapter implements SocialProviderAdapter {
     const account = await getAccountRecord(input.accountId);
     const accessToken = account.accessToken!;
 
-    const log = (msg: string) => this.#log(input.jobId, msg);
+    const log = (msg: string) => adapterLog(input.jobId, msg);
     const mime = getMimeType(input.videoPath);
-    const size = fs.statSync(input.videoPath).size;
+    const size = await statWithRetry(input.videoPath);
     await log(`YouTube upload — ${(size / 1024 / 1024).toFixed(1)}MB`);
 
     // ── Phase 1: open a resumable upload session ──────────────────────────────
@@ -276,14 +277,6 @@ export class YouTubeAdapter implements SocialProviderAdapter {
     }
   }
 
-  async #log(jobId: string | undefined, msg: string): Promise<void> {
-    if (!jobId) return;
-    try {
-      await appendLog(jobId, "info", msg);
-    } catch {
-      /* logging is best-effort; never let it derail the upload */
-    }
-  }
 
   async #ensureFreshToken(accountId: string) {
     const account = await getAccountRecord(accountId);

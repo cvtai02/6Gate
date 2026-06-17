@@ -31,6 +31,12 @@ import { RemoveGroupDestinationUseCase } from "../usecases/commands/remove-group
 import { RemoveGroupQueueItemUseCase } from "../usecases/commands/remove-group-queue-item.usecase";
 import { RenameGroupUseCase } from "../usecases/commands/rename-group.usecase";
 import { UpdateGroupUploadSettingsUseCase } from "../usecases/commands/update-group-upload-settings.usecase";
+import { UpdateGroupTelegramNotifyUseCase } from "../usecases/commands/update-group-telegram-notify.usecase";
+import { GetGroupTelegramNotifyUseCase } from "../usecases/queries/get-group-telegram-notify.usecase";
+import { AddGroupNotificationChannelUseCase } from "../usecases/commands/add-group-notification-channel.usecase";
+import { RemoveGroupNotificationChannelUseCase } from "../usecases/commands/remove-group-notification-channel.usecase";
+import { ListGroupNotificationChannelsUseCase } from "../usecases/queries/list-group-notification-channels.usecase";
+import { ListAllSchedulesUseCase } from "../usecases/queries/list-all-schedules.usecase";
 import { GetGroupHistoryUseCase } from "../usecases/queries/get-group-history.usecase";
 import { GetGroupUploadSettingsUseCase } from "../usecases/queries/get-group-upload-settings.usecase";
 import { GetNextUploadTimeUseCase } from "../usecases/queries/get-next-upload-time.usecase";
@@ -42,6 +48,7 @@ import type { CreateUploadJobsDto } from "../dtos/create-upload-jobs.dto";
 import type { EnqueueGroupUploadDto } from "../dtos/enqueue-group-upload.dto";
 import type { RenameGroupDto } from "../dtos/rename-group.dto";
 import type { UpdateGroupUploadSettingsDto } from "../dtos/update-group-upload-settings.dto";
+import type { UpdateGroupTelegramNotifyDto } from "../dtos/update-group-telegram-notify.dto";
 import type { UploadedFileMetadataDto } from "../dtos/uploaded-file-metadata.dto";
 
 const uploadedVideoInterceptor = FileInterceptor("file", {
@@ -66,9 +73,28 @@ function statusFromError(err: unknown) {
   return typeof status === "number" ? status : 400;
 }
 
+function errorBody(err: unknown) {
+  return { error: err instanceof Error ? err.message : String(err) };
+}
+
+async function handleRequest<T>(
+  res: Response,
+  fn: () => Promise<T>,
+  successStatus?: number,
+): Promise<T | { error: string }> {
+  try {
+    if (successStatus) res.status(successStatus);
+    return await fn();
+  } catch (err) {
+    res.status(statusFromError(err));
+    return errorBody(err);
+  }
+}
+
 @Controller()
 export class GroupsController {
   constructor(
+    private readonly listAllSchedules: ListAllSchedulesUseCase,
     private readonly listGroups: ListGroupsUseCase,
     private readonly createGroup: CreateGroupUseCase,
     private readonly renameGroup: RenameGroupUseCase,
@@ -85,7 +111,17 @@ export class GroupsController {
     private readonly createGroupUploadFileJobs: CreateGroupUploadFileJobsUseCase,
     private readonly createGroupUploadJobs: CreateGroupUploadJobsUseCase,
     private readonly enqueueGroupUploadFile: EnqueueGroupUploadFileUseCase,
+    private readonly getGroupTelegramNotify: GetGroupTelegramNotifyUseCase,
+    private readonly updateGroupTelegramNotify: UpdateGroupTelegramNotifyUseCase,
+    private readonly addGroupNotificationChannel: AddGroupNotificationChannelUseCase,
+    private readonly removeGroupNotificationChannel: RemoveGroupNotificationChannelUseCase,
+    private readonly listGroupNotificationChannels: ListGroupNotificationChannelsUseCase,
   ) {}
+
+  @Get("schedules")
+  schedules() {
+    return this.listAllSchedules.execute();
+  }
 
   @Get(["groups", "combos"])
   list() {
@@ -94,13 +130,7 @@ export class GroupsController {
 
   @Post(["groups", "combos"])
   async create(@Body() body: CreateGroupDto, @Res({ passthrough: true }) res: Response) {
-    try {
-      res.status(201);
-      return await this.createGroup.execute(body);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.createGroup.execute(body), 201);
   }
 
   @Patch(["groups/:id", "combos/:id"])
@@ -130,13 +160,7 @@ export class GroupsController {
     @Body() body: AddGroupDestinationDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      res.status(201);
-      return await this.addGroupDestination.execute(id, body.destinationId);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.addGroupDestination.execute(id, body.destinationId), 201);
   }
 
   @Delete(["groups/:id/destinations/:destinationId", "combos/:id/destinations/:destinationId"])
@@ -152,12 +176,7 @@ export class GroupsController {
 
   @Get(["groups/:id/queue", "combos/:id/queue"])
   async listQueue(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
-    try {
-      return await this.listGroupQueue.execute(id);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.listGroupQueue.execute(id));
   }
 
   @Post(["groups/:id/queue", "combos/:id/queue"])
@@ -167,14 +186,10 @@ export class GroupsController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      res.status(201);
+    return handleRequest(res, async () => {
       const item = await this.enqueueGroupUpload.execute(id, body);
       return { ...item, queueLink: new URL(`/groups/${id}/queue`, requestBaseUrl(req)).toString() };
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    }, 201);
   }
 
   @Post(["groups/:id/queue-file", "combos/:id/queue-file"])
@@ -186,15 +201,11 @@ export class GroupsController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
+    return handleRequest(res, async () => {
       if (!file?.path) throw new Error("file is required");
-      res.status(201);
       const item = await this.enqueueGroupUploadFile.execute(id, file.path, body);
       return { ...item, queueLink: new URL(`/groups/${id}/queue`, requestBaseUrl(req)).toString() };
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    }, 201);
   }
 
   @Delete(["groups/:id/queue/:itemId", "combos/:id/queue/:itemId"])
@@ -205,22 +216,12 @@ export class GroupsController {
 
   @Get(["groups/:id/queue-settings", "combos/:id/queue-settings"])
   async getUploadSettings(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
-    try {
-      return await this.getGroupUploadSettings.execute(id);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.getGroupUploadSettings.execute(id));
   }
 
   @Get(["groups/:id/next-upload-time", "combos/:id/next-upload-time"])
   async getNextUpload(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
-    try {
-      return await this.getNextUploadTime.execute(id);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.getNextUploadTime.execute(id));
   }
 
   @Patch(["groups/:id/queue-settings", "combos/:id/queue-settings"])
@@ -229,12 +230,7 @@ export class GroupsController {
     @Body() body: UpdateGroupUploadSettingsDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      return await this.updateGroupUploadSettings.execute(id, body);
-    } catch (err) {
-      res.status(statusFromError(err));
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.updateGroupUploadSettings.execute(id, body));
   }
 
   @Post(["groups/:id/upload", "combos/:id/upload"])
@@ -245,12 +241,44 @@ export class GroupsController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
-      return await this.createGroupUploadJobs.execute(id, body, requestBaseUrl(req));
-    } catch (err) {
-      res.status(400);
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+    return handleRequest(res, () => this.createGroupUploadJobs.execute(id, body, requestBaseUrl(req)));
+  }
+
+  @Get(["groups/:id/telegram-notify", "combos/:id/telegram-notify"])
+  async getTelegramNotify(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
+    return handleRequest(res, () => this.getGroupTelegramNotify.execute(id));
+  }
+
+  @Patch(["groups/:id/telegram-notify", "combos/:id/telegram-notify"])
+  async setTelegramNotify(
+    @Param("id") id: string,
+    @Body() body: UpdateGroupTelegramNotifyDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return handleRequest(res, () => this.updateGroupTelegramNotify.execute(id, body));
+  }
+
+  @Get(["groups/:id/notification-channels", "combos/:id/notification-channels"])
+  async listNotificationChannels(@Param("id") id: string, @Res({ passthrough: true }) res: Response) {
+    return handleRequest(res, () => this.listGroupNotificationChannels.execute(id));
+  }
+
+  @Post(["groups/:id/notification-channels", "combos/:id/notification-channels"])
+  async addNotificationChannel(
+    @Param("id") id: string,
+    @Body() body: { accountId: string; chatId: string; chatName?: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return handleRequest(res, () => this.addGroupNotificationChannel.execute(id, body), 201);
+  }
+
+  @Delete(["groups/:id/notification-channels/:channelId", "combos/:id/notification-channels/:channelId"])
+  async removeNotificationChannel(
+    @Param("id") id: string,
+    @Param("channelId") channelId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return handleRequest(res, () => this.removeGroupNotificationChannel.execute(id, channelId));
   }
 
   @Post(["groups/:id/upload-file", "combos/:id/upload-file"])
@@ -262,12 +290,9 @@ export class GroupsController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    try {
+    return handleRequest(res, () => {
       if (!file?.path) throw new Error("file is required");
-      return await this.createGroupUploadFileJobs.execute(id, file.path, body, requestBaseUrl(req));
-    } catch (err) {
-      res.status(400);
-      return { error: err instanceof Error ? err.message : String(err) };
-    }
+      return this.createGroupUploadFileJobs.execute(id, file.path, body, requestBaseUrl(req));
+    });
   }
 }

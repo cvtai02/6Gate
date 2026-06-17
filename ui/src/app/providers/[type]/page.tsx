@@ -55,7 +55,6 @@ function destUrl(dest: Destination): string | null {
   if (type === "tiktok_account" && accountUsername) return `https://www.tiktok.com/@${accountUsername}`;
   if (type === "instagram_account" && accountUsername) return `https://www.instagram.com/${accountUsername}`;
   if (type === "threads_profile" && accountUsername) return `https://www.threads.net/@${accountUsername}`;
-  if (type === "TelegramChat" && validId?.startsWith("@")) return `https://t.me/${validId.slice(1)}`;
   return null;
 }
 
@@ -65,7 +64,6 @@ const DEST_COLORS: Record<string, string> = {
   tiktok_account: "bg-gray-800",
   instagram_account: "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-400",
   threads_profile: "bg-black",
-  TelegramChat: "bg-sky-500",
 };
 const DEST_ABBR: Record<string, string> = {
   youtube_channel: "YT",
@@ -73,7 +71,6 @@ const DEST_ABBR: Record<string, string> = {
   tiktok_account: "TK",
   instagram_account: "IG",
   threads_profile: "TH",
-  TelegramChat: "TG",
 };
 const DEST_LABEL: Record<string, string> = {
   youtube_channel: "YouTube Channel",
@@ -81,7 +78,6 @@ const DEST_LABEL: Record<string, string> = {
   tiktok_account: "TikTok Account",
   instagram_account: "Instagram Account",
   threads_profile: "Threads Profile",
-  TelegramChat: "Telegram Chat",
 };
 
 /* ── Provider metadata (same as list page) ──────────────────────────── */
@@ -152,12 +148,6 @@ function ZernioIcon({ className }: { className?: string }) {
   );
 }
 
-function TelegramIcon({ className }: { className?: string }) {
-  return (
-    <img className={className} src="/icons/telegram.svg" alt="" aria-hidden="true" />
-  );
-}
-
 const PROVIDER_META: Record<string, ProviderMeta> = {
   youtube: {
     label: "YouTube",
@@ -208,18 +198,6 @@ const PROVIDER_META: Record<string, ProviderMeta> = {
     ],
     Icon: ZernioIcon,
   },
-  telegram: {
-    label: "Telegram",
-    defaultScopes: "",
-    devConsole: "https://core.telegram.org/bots",
-    devConsoleLabel: "Telegram Bot API",
-    notes: [
-      "Create a bot with BotFather and copy the bot token.",
-      "Add the bot to the target group or channel with posting permission.",
-      "Optionally add the first chat ID while connecting the bot account.",
-    ],
-    Icon: TelegramIcon,
-  },
 };
 
 const ICON_COLORS: Record<string, string> = {
@@ -227,7 +205,6 @@ const ICON_COLORS: Record<string, string> = {
   tiktok: "bg-gray-900",
   meta: "bg-white/10",
   zernio: "bg-transparent",
-  telegram: "bg-sky-500",
 };
 
 const OAUTH_CALLBACK_PATH = "/api/accounts/oauth/callback";
@@ -253,7 +230,7 @@ function ConfigureAppModal({
 }) {
   const meta = PROVIDER_META[type];
   const isEdit = !!existing;
-  const isApiKeyProvider = type === ProviderType.zernio || type === ProviderType.telegram;
+  const isApiKeyProvider = type === ProviderType.zernio;
   const [form, setForm] = useState({
     name: existing?.name ?? `My ${meta.label} App`,
     clientId: existing?.clientId ?? "",
@@ -692,129 +669,6 @@ function ZernioAccountModal({
   );
 }
 
-function TelegramAccountModal({
-  provider,
-  onClose,
-  onConnected,
-}: {
-  provider: Provider;
-  onClose: () => void;
-  onConnected: () => void;
-}) {
-  const [form, setForm] = useState({
-    name: "Telegram Bot",
-    botToken: "",
-    chatId: "",
-    chatName: "",
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError("");
-    try {
-      const res = await fetch("/api/accounts/telegram/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerId: provider.id,
-          name: form.name,
-          botToken: form.botToken,
-          chatId: form.chatId || undefined,
-          chatName: form.chatName || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to add Telegram bot");
-      } else {
-        onConnected();
-        onClose();
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-white">Add Telegram Bot</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Bot Name</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Bot Token</label>
-            <input
-              required
-              type="password"
-              value={form.botToken}
-              onChange={(e) => setForm((f) => ({ ...f, botToken: e.target.value }))}
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-              placeholder="123456:ABC..."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Chat ID</label>
-              <input
-                value={form.chatId}
-                onChange={(e) => setForm((f) => ({ ...f, chatId: e.target.value }))}
-                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder="@channel or -100..."
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Chat Name</label>
-              <input
-                value={form.chatName}
-                onChange={(e) => setForm((f) => ({ ...f, chatName: e.target.value }))}
-                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder="optional"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors"
-            >
-              {submitting ? "Adding…" : "Add Bot"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 /* ── Account row ─────────────────────────────────────────────────────── */
 
 function AccountRow({
@@ -1093,8 +947,7 @@ function ProviderSection({
   const [syncMsg, setSyncMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const isFacebookProvider = provider.type === ProviderType.meta;
   const isZernioProvider = provider.type === ProviderType.zernio;
-  const isTelegramProvider = provider.type === ProviderType.telegram;
-  const usesOAuth = !isZernioProvider && !isTelegramProvider;
+  const usesOAuth = !isZernioProvider;
 
   async function handleSync() {
     setSyncing(true);
@@ -1155,13 +1008,6 @@ function ProviderSection({
       )}
       {showApiKeyConnect && isZernioProvider && (
         <ZernioAccountModal
-          provider={provider}
-          onClose={() => setShowApiKeyConnect(false)}
-          onConnected={onDestinationsChanged}
-        />
-      )}
-      {showApiKeyConnect && isTelegramProvider && (
-        <TelegramAccountModal
           provider={provider}
           onClose={() => setShowApiKeyConnect(false)}
           onConnected={onDestinationsChanged}
@@ -1281,10 +1127,9 @@ function ProviderDetailContent() {
   const [editingProvider, setEditingProvider] = useState<Provider | null | "new">(null);
   const [flash, setFlash] = useState<{ kind: "success" | "error"; msg: string } | null>(null);
 
-  // Redirect unknown types back to providers list
   useEffect(() => {
     if (!meta) router.replace("/providers");
-  }, [meta, router]);
+  }, [type, meta, router]);
 
   async function load() {
     const [provRes, accRes, destRes] = await Promise.all([

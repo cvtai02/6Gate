@@ -4,6 +4,7 @@ import { CancelJobUseCase } from "../usecases/commands/cancel-job.usecase";
 import { CreateJobUseCase } from "../usecases/commands/create-job.usecase";
 import { DeleteJobUseCase } from "../usecases/commands/delete-job.usecase";
 import { RetryJobUseCase } from "../usecases/commands/retry-job.usecase";
+import { GetBatchDetailUseCase } from "../usecases/queries/get-batch-detail.usecase";
 import { GetJobDetailUseCase } from "../usecases/queries/get-job-detail.usecase";
 import { GetJobLogsUseCase } from "../usecases/queries/get-job-logs.usecase";
 import { GetJobUseCase } from "../usecases/queries/get-job.usecase";
@@ -19,6 +20,7 @@ export class JobsController {
     private readonly listJobs: ListJobsUseCase,
     private readonly listJobsTable: ListJobsTableUseCase,
     private readonly createJob: CreateJobUseCase,
+    private readonly getBatchDetail: GetBatchDetailUseCase,
     private readonly getJobDetail: GetJobDetailUseCase,
     private readonly getJob: GetJobUseCase,
     private readonly getJobLogs: GetJobLogsUseCase,
@@ -35,6 +37,16 @@ export class JobsController {
   @Get("table")
   table() {
     return this.listJobsTable.execute();
+  }
+
+  @Get("batch/:batchId")
+  async batch(@Param("batchId") batchId: string, @Res({ passthrough: true }) res: Response) {
+    const detail = await this.getBatchDetail.execute(batchId);
+    if (!detail) {
+      res.status(404);
+      return { error: "Not found" };
+    }
+    return detail;
   }
 
   @Post()

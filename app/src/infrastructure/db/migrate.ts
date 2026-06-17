@@ -259,6 +259,36 @@ export async function runMigrations() {
     ON CONFLICT (id) DO NOTHING
   `);
 
+  // Notification channels — replaces per-group telegram columns with a many-to-many table
+  await run(`
+    CREATE TABLE IF NOT EXISTS group_notification_channels (
+      id TEXT PRIMARY KEY,
+      group_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      chat_id TEXT NOT NULL,
+      chat_name TEXT,
+      created_at TEXT NOT NULL
+    )
+  `);
+  await run(`CREATE INDEX IF NOT EXISTS idx_gnc_group ON group_notification_channels(group_id)`);
+
+  // Migrate legacy per-group telegram columns into the new table
+  await run(`ALTER TABLE combos ADD COLUMN IF NOT EXISTS telegram_bot_account_id TEXT`);
+  await run(`ALTER TABLE combos ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT`);
+  await run(`
+    INSERT INTO group_notification_channels (id, group_id, account_id, chat_id, created_at)
+    SELECT
+      'migrated-' || id,
+      id,
+      telegram_bot_account_id,
+      telegram_chat_id,
+      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+    FROM combos
+    WHERE telegram_bot_account_id IS NOT NULL
+      AND telegram_chat_id IS NOT NULL
+    ON CONFLICT (id) DO NOTHING
+  `);
+
   // Remove settings that don't belong here.
   await run(
     `DELETE FROM settings WHERE key IN ('dataDir','dbPath','uploadsDir','logsDir','configDir','port','zernioBaseUrl','storageAccessToken','storageBaseDirectory')`,

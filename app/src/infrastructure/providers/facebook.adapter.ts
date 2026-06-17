@@ -9,11 +9,11 @@ import {
   getProviderRecord,
   getAccountRecord,
   checkHttpOk,
+  statWithRetry,
 } from "./adapter-utils";
 import { ProviderType, DestinationType, PublishStatus } from "@/core/enums";
 import { syncInstagramForPage, syncThreadsForUser } from "./meta-ig-threads";
-import { appendLog } from "@/infrastructure/jobs/log-service";
-import { getJob } from "@/infrastructure/jobs/job-service";
+import { adapterLog, throwIfCancelled } from "./adapter-utils";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 const GRAPH_VIDEO = "https://graph-video.facebook.com/v21.0";
@@ -234,12 +234,12 @@ export class FacebookAdapter implements SocialProviderAdapter {
     pageId: string,
     pageToken: string
   ): Promise<PublishVideoResult> {
-    const log = (msg: string) => this.#log(input.jobId, msg);
-    const fileSize = fs.statSync(input.videoPath).size;
+    const log = (msg: string) => adapterLog(input.jobId, msg);
+    const fileSize = await statWithRetry(input.videoPath);
     await log(`Page video upload — ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
 
     // Phase 1: start — Facebook tells us the chunk boundaries.
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 1/4: requesting upload session");
     const startBody = new URLSearchParams({
       upload_phase: "start",
@@ -253,7 +253,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
       body: startBody,
     });
     if (!startRes.ok) throw await readFbError(startRes, "start phase");
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     const startData = await startRes.json();
     const videoId: string = startData.video_id;
     const uploadSessionId: string = startData.upload_session_id;
@@ -262,12 +262,12 @@ export class FacebookAdapter implements SocialProviderAdapter {
     await log(`Got video_id=${videoId}, session=${uploadSessionId}`);
 
     // Phase 2: transfer chunks until start_offset == end_offset.
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log(`Phase 2/4: transferring chunks`);
     const fd = fs.openSync(input.videoPath, "r");
     try {
       while (curStart < curEnd) {
-        await this.#throwIfCancelled(input.jobId);
+        await throwIfCancelled(input.jobId);
         const chunkSize = curEnd - curStart;
         const buf = Buffer.alloc(chunkSize);
         fs.readSync(fd, buf, 0, chunkSize, curStart);
@@ -289,7 +289,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
           body: transferForm,
         });
         if (!transferRes.ok) throw await readFbError(transferRes, "transfer chunk");
-        await this.#throwIfCancelled(input.jobId);
+        await throwIfCancelled(input.jobId);
 
         const transferData = await transferRes.json();
         curStart = Number(transferData.start_offset);
@@ -303,7 +303,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
     }
 
     // Phase 3: finish — commit the upload with metadata.
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 3/4: finishing upload");
     const finishBody = new URLSearchParams({
       upload_phase: "finish",
@@ -324,7 +324,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
       body: finishBody,
     });
     if (!finishRes.ok) throw await readFbError(finishRes, "finish phase");
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
 
     // Phase 4: poll processing status.
     await log("Phase 4/4: waiting for Facebook to finish processing");
@@ -345,26 +345,26 @@ export class FacebookAdapter implements SocialProviderAdapter {
     pageId: string,
     pageToken: string
   ): Promise<PublishVideoResult> {
-    const log = (msg: string) => this.#log(input.jobId, msg);
-    const fileSize = fs.statSync(input.videoPath).size;
+    const log = (msg: string) => adapterLog(input.jobId, msg);
+    const fileSize = await statWithRetry(input.videoPath);
     await log(`Reel upload — ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
 
     // Phase 1: start
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 1/4: starting Reel session");
     const startRes = await fetch(
       `${GRAPH}/${pageId}/video_reels?upload_phase=start&access_token=${encodeURIComponent(pageToken)}`,
       { method: "POST", signal: AbortSignal.timeout(30_000) }
     );
     if (!startRes.ok) throw await readFbError(startRes, "Reel start");
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     const startData = await startRes.json();
     const videoId: string = startData.video_id;
     const uploadUrl: string = startData.upload_url;
     await log(`Got video_id=${videoId}`);
 
     // Phase 2: upload binary to rupload URL — single POST with OAuth + offset + file_size headers.
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 2/4: uploading binary to rupload URL");
     const videoBuf = fs.readFileSync(input.videoPath);
     const uploadRes = await fetch(uploadUrl, {
@@ -378,11 +378,11 @@ export class FacebookAdapter implements SocialProviderAdapter {
       body: videoBuf,
     });
     if (!uploadRes.ok) throw await readFbError(uploadRes, "Reel binary upload");
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Binary upload complete");
 
     // Phase 3: finish — video_state=PUBLISHED unless privacy=private (then DRAFT).
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 3/4: finishing Reel");
     const videoState = input.privacy === "private" ? "DRAFT" : "PUBLISHED";
     const finishParams = new URLSearchParams({
@@ -398,7 +398,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
       { method: "POST", signal: AbortSignal.timeout(60_000) }
     );
     if (!finishRes.ok) throw await readFbError(finishRes, "Reel finish");
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
 
     // Phase 4: poll status
     await log("Phase 4/4: waiting for Facebook to finish processing");
@@ -422,17 +422,17 @@ export class FacebookAdapter implements SocialProviderAdapter {
     const MAX_ATTEMPTS = 40; // ~10 min at the cap
     let lastReported = "";
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      await this.#throwIfCancelled(jobId);
+      await throwIfCancelled(jobId);
       // 5s, 7s, 9s, ... cap at 20s
       const waitMs = Math.min(20_000, 5_000 + i * 2_000);
       await new Promise((r) => setTimeout(r, waitMs));
-      await this.#throwIfCancelled(jobId);
+      await throwIfCancelled(jobId);
 
       const res = await fetch(
         `${GRAPH}/${videoId}?fields=status&access_token=${encodeURIComponent(accessToken)}`,
         { signal: AbortSignal.timeout(30_000) }
       );
-      await this.#throwIfCancelled(jobId);
+      await throwIfCancelled(jobId);
       if (!res.ok) continue; // transient — keep polling
 
       const body = await res.json().catch(() => ({}));
@@ -440,7 +440,7 @@ export class FacebookAdapter implements SocialProviderAdapter {
       const ps: string | undefined = body.status?.processing_phase?.status;
 
       if (vs && vs !== lastReported) {
-        await this.#log(jobId, `Facebook status: ${vs}${ps ? ` (${ps})` : ""}`);
+        await adapterLog(jobId, `Facebook status: ${vs}${ps ? ` (${ps})` : ""}`);
         lastReported = vs;
       }
 
@@ -453,28 +453,12 @@ export class FacebookAdapter implements SocialProviderAdapter {
       // "processing" / unknown → loop
     }
 
-    await this.#log(
+    await adapterLog(
       jobId,
       "Facebook processing did not complete within poll window; the video may still appear shortly"
     );
   }
 
-  async #log(jobId: string | undefined, msg: string): Promise<void> {
-    if (!jobId) return;
-    try {
-      await appendLog(jobId, "info", msg);
-    } catch {
-      /* logging is best-effort; never let it derail the upload */
-    }
-  }
-
-  async #throwIfCancelled(jobId: string | undefined): Promise<void> {
-    if (!jobId) return;
-    const job = await getJob(jobId);
-    if (job?.status === PublishStatus.Cancelled) {
-      throw new Error("Job cancelled");
-    }
-  }
 }
 
 /** Pull a useful error message from a Meta Graph API error response. */

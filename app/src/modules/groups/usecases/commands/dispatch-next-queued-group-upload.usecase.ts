@@ -10,6 +10,7 @@ import {
   QUEUE_STATUS_FAILED,
   QUEUE_STATUS_PENDING,
 } from "../shared/group-helpers";
+import { isUrl } from "../shared/storage-helper";
 
 @Injectable()
 export class DispatchNextQueuedGroupUploadUseCase {
@@ -33,16 +34,14 @@ export class DispatchNextQueuedGroupUploadUseCase {
         caption: next.caption ?? undefined,
         privacy: next.privacy ?? undefined,
       };
-      const result = existsSync(next.videoPath)
-        ? await this.createUploadJobs.executeFromLocalFile(groupId, next.videoPath, metadata, LOCAL_SCHEDULER_BASE_URL)
-        : await this.createUploadJobs.execute(
-            groupId,
-            {
-              absolutePath: next.videoPath,
-              ...metadata,
-            },
-            LOCAL_SCHEDULER_BASE_URL,
-          );
+      let result;
+      if (existsSync(next.videoPath)) {
+        result = await this.createUploadJobs.executeFromLocalFile(groupId, next.videoPath, metadata, LOCAL_SCHEDULER_BASE_URL);
+      } else if (isUrl(next.videoPath)) {
+        result = await this.createUploadJobs.execute(groupId, { videoUrl: next.videoPath, ...metadata }, LOCAL_SCHEDULER_BASE_URL);
+      } else {
+        result = await this.createUploadJobs.execute(groupId, { absolutePath: next.videoPath, ...metadata }, LOCAL_SCHEDULER_BASE_URL);
+      }
       await db
         .update(groupUploadQueue)
         .set({

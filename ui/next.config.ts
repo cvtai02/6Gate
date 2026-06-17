@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: import.meta.dirname,
+  },
   experimental: {
     // Default is 10MB; bump for video uploads going through proxy.ts.
     externalDir: true,

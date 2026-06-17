@@ -5,6 +5,7 @@ import { CreateJobUseCase } from "./usecases/commands/create-job.usecase";
 import { DeleteJobUseCase } from "./usecases/commands/delete-job.usecase";
 import { RetryJobUseCase } from "./usecases/commands/retry-job.usecase";
 import { StartJobRunnerUseCase } from "./usecases/commands/start-job-runner.usecase";
+import { GetBatchDetailUseCase } from "./usecases/queries/get-batch-detail.usecase";
 import { GetJobDetailUseCase } from "./usecases/queries/get-job-detail.usecase";
 import { GetJobLogsUseCase } from "./usecases/queries/get-job-logs.usecase";
 import { GetJobUseCase } from "./usecases/queries/get-job.usecase";
@@ -19,6 +20,7 @@ import { ListJobsUseCase } from "./usecases/queries/list-jobs.usecase";
     DeleteJobUseCase,
     RetryJobUseCase,
     StartJobRunnerUseCase,
+    GetBatchDetailUseCase,
     GetJobDetailUseCase,
     GetJobLogsUseCase,
     GetJobUseCase,

@@ -4,9 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
 import { accounts, destinations } from "@/infrastructure/db/schema";
 import { ProviderType, PublishStatus } from "@/core/enums";
-import { appendLog } from "@/infrastructure/jobs/log-service";
-import { getJob } from "@/infrastructure/jobs/job-service";
-import { getMimeType, getProviderRecord } from "./adapter-utils";
+import { adapterLog, throwIfCancelled, getMimeType, getProviderRecord, statWithRetry } from "./adapter-utils";
 import type { PublishVideoInput, PublishVideoResult, SocialProviderAdapter } from "./types";
 import { readZernioJson, zernioFetch, zernioPlatformForDestination } from "./zernio-service";
 
@@ -42,13 +40,13 @@ export class ZernioAdapter implements SocialProviderAdapter {
     const platform = zernioPlatformForDestination(destination?.type) ?? this.#platformFromAccount(account.scopes);
     if (!platform) throw new Error("Unsupported Zernio destination. Supported: TikTok, Facebook Page, Instagram, YouTube.");
 
-    const log = (msg: string) => this.#log(input.jobId, msg);
-    const stat = fs.statSync(input.videoPath);
+    const log = (msg: string) => adapterLog(input.jobId, msg);
+    const fileSize = await statWithRetry(input.videoPath);
     const mime = getMimeType(input.videoPath);
     const fileName = path.basename(input.videoPath);
 
-    await log(`Zernio upload - ${(stat.size / 1024 / 1024).toFixed(1)}MB`);
-    await this.#throwIfCancelled(input.jobId);
+    await log(`Zernio upload - ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
+    await throwIfCancelled(input.jobId);
 
     await log("Phase 1/3: requesting Zernio media upload URL");
     const credentials = {
@@ -59,7 +57,7 @@ export class ZernioAdapter implements SocialProviderAdapter {
     const presignRes = await zernioFetch(credentials, "/media/presign", {
       method: "POST",
       signal: AbortSignal.timeout(30_000),
-      body: JSON.stringify({ fileName, fileType: mime }),
+      body: JSON.stringify({ filename: fileName, contentType: mime }),
     });
     const presign = await readZernioJson<{ uploadUrl?: string; publicUrl?: string }>(
       presignRes,
@@ -69,14 +67,14 @@ export class ZernioAdapter implements SocialProviderAdapter {
       throw new Error("Zernio media presign response did not include uploadUrl/publicUrl");
     }
 
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 2/3: uploading video to Zernio storage");
     const uploadRes = await fetch(presign.uploadUrl, {
       method: "PUT",
       signal: AbortSignal.timeout(30 * 60_000),
       headers: {
         "Content-Type": mime,
-        "Content-Length": String(stat.size),
+        "Content-Length": String(fileSize),
       },
       body: fs.createReadStream(input.videoPath) as unknown as BodyInit,
       duplex: "half",
@@ -86,7 +84,7 @@ export class ZernioAdapter implements SocialProviderAdapter {
       throw new Error(`Zernio media upload failed (${uploadRes.status}): ${text.slice(0, 500)}`);
     }
 
-    await this.#throwIfCancelled(input.jobId);
+    await throwIfCancelled(input.jobId);
     await log("Phase 3/3: creating Zernio post");
     const createRes = await zernioFetch(credentials, "/posts", {
       method: "POST",
@@ -109,7 +107,7 @@ export class ZernioAdapter implements SocialProviderAdapter {
     const providerPostId = this.#postId(post);
     const url = this.#postUrl(post);
 
-    await log(`Zernio post created${providerPostId ? `: ${providerPostId}` : ""}`);
+    await log(`Zernio post created${providerPostId ? `: ${providerPostId}` : ""}${url ? ` → ${url}` : ""}`);
     return { providerPostId: providerPostId ?? `zernio_${Date.now()}`, url };
   }
 
@@ -153,10 +151,14 @@ export class ZernioAdapter implements SocialProviderAdapter {
   }
 
   #postUrl(post: Record<string, unknown>): string | undefined {
+    const plat = (post.platforms as Record<string, unknown>[] | undefined)?.[0];
     return (
+      this.#asString(plat?.publishedUrl) ??
+      this.#asString(post.publishedUrl) ??
+      this.#asString(plat?.platformPostUrl) ??
       this.#asString(post.platformPostUrl) ??
-      this.#asString(post.url) ??
-      this.#asString((post.platforms as Record<string, unknown>[] | undefined)?.[0]?.platformPostUrl)
+      this.#asString(plat?.postUrl) ??
+      this.#asString(post.url)
     );
   }
 
@@ -164,20 +166,4 @@ export class ZernioAdapter implements SocialProviderAdapter {
     return typeof value === "string" && value ? value : undefined;
   }
 
-  async #log(jobId: string | undefined, msg: string): Promise<void> {
-    if (!jobId) return;
-    try {
-      await appendLog(jobId, "info", msg);
-    } catch {
-      /* logging is best-effort; never let it derail the upload */
-    }
-  }
-
-  async #throwIfCancelled(jobId: string | undefined): Promise<void> {
-    if (!jobId) return;
-    const job = await getJob(jobId);
-    if (job?.status === PublishStatus.Cancelled) {
-      throw new Error("Job cancelled");
-    }
-  }
 }

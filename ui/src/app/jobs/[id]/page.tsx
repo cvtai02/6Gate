@@ -5,6 +5,7 @@ import { CancelButton } from "./cancel-button";
 import Link from "next/link";
 import { createServerApiClient } from "@/lib/api-client";
 import type { JobDto, JobLogDto } from "@/lib/api-client";
+import { DEST_TYPE_LABEL } from "@/lib/destination-types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,14 +31,6 @@ const PLATFORM_CHIP: Record<string, string> = {
 };
 const PLATFORM_ABBR: Record<string, string> = {
   youtube: "YT", meta: "FB", tiktok: "TK",
-};
-const DEST_TYPE_LABEL: Record<string, string> = {
-  youtube_channel:  "YouTube Channel",
-  facebook_page:    "Facebook Page",
-  tiktok_account:   "TikTok Account",
-  instagram_account: "Instagram Account",
-  threads_profile:  "Threads Profile",
-  TelegramChat: "Telegram Chat",
 };
 
 function fmt(iso: string | null | undefined) {

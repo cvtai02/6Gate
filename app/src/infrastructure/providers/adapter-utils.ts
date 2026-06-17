@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { getDb } from "@/infrastructure/db";
 import { providers, accounts, destinations } from "@/infrastructure/db/schema";
 import { eq } from "drizzle-orm";
-import { ProviderType, DestinationType } from "@/core/enums";
+import { ProviderType, DestinationType, PublishStatus } from "@/core/enums";
 
 const DESTINATION_TYPE: Record<string, DestinationType> = {
   [ProviderType.youtube]: DestinationType.youtube_channel,
@@ -62,6 +62,18 @@ export async function getAccountRecord(accountId: string) {
   return account;
 }
 
+export async function statWithRetry(filePath: string, maxAttempts = 10): Promise<number> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      return fs.statSync(filePath).size;
+    } catch (err: any) {
+      if (i === maxAttempts - 1) throw err;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error(`File not found after ${maxAttempts} attempts: ${filePath}`);
+}
+
 export function getMimeType(filePath: string): string {
   const ext = (filePath.split(".").pop() ?? "").toLowerCase();
   const map: Record<string, string> = {
@@ -88,5 +100,24 @@ export async function checkHttpOk(res: Response, context: string) {
   if (!res.ok) {
     const text = await res.text().catch(() => `HTTP ${res.status}`);
     throw new Error(`${context}: ${text}`);
+  }
+}
+
+export async function adapterLog(jobId: string | undefined, msg: string): Promise<void> {
+  if (!jobId) return;
+  const { appendLog } = await import("../jobs/log-service");
+  try {
+    await appendLog(jobId, "info", msg);
+  } catch {
+    /* best-effort */
+  }
+}
+
+export async function throwIfCancelled(jobId: string | undefined): Promise<void> {
+  if (!jobId) return;
+  const { getJob } = await import("../jobs/job-service");
+  const job = await getJob(jobId);
+  if (job?.status === PublishStatus.Cancelled) {
+    throw new Error("Job cancelled");
   }
 }

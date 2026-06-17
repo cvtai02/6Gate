@@ -4,15 +4,21 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 
 ## Upload APIs
 
+Three video input methods are supported across all upload endpoints:
+- **File upload** (multipart `file` field)
+- **CDN URL** (`videoUrl` JSON field) — any publicly accessible video URL
+- **7router storage path** (`absolutePath` JSON field)
+
 ### Immediate upload
-`POST /api/groups/:id/upload` — download from 7router and immediately create post jobs for all destinations.
+`POST /api/groups/:id/upload` — JSON body with `absolutePath` or `videoUrl`; downloads and immediately creates post jobs.
 
-`POST /api/groups/:id/upload-file` — accept a multipart `file` upload, store it on the backend, and immediately create post jobs for all destinations.
+`POST /api/groups/:id/upload-file` — multipart `file` upload; stores and immediately creates post jobs.
 
-**Body:**
+**JSON body (either field):**
 ```json
 {
   "absolutePath": "CloudflareR2/account/bucket/folder/video.mp4",
+  "videoUrl": "https://cdn.example.com/video.mp4",
   "title": "optional title",
   "caption": "optional caption",
   "privacy": "public"
@@ -20,21 +26,11 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 ```
 
 ### Queue an upload
-`POST /api/groups/:id/queue` — enqueue a 7router absolute path; dispatched at the group's daily upload time.
+`POST /api/groups/:id/queue` — JSON body with `absolutePath` or `videoUrl`; enqueued for scheduled dispatch.
 
-`POST /api/groups/:id/queue-file` — accept a multipart `file` upload, store it on the backend, and enqueue it for scheduled dispatch.
+`POST /api/groups/:id/queue-file` — multipart `file` upload; stored and enqueued for scheduled dispatch.
 
-**Body:**
-```json
-{
-  "absolutePath": "CloudflareR2/account/bucket/folder/video.mp4",
-  "title": "optional title",
-  "caption": "optional caption",
-  "privacy": "public"
-}
-```
-
-`absolutePath` must be a 7router absolute path in the format `Provider/account/bucket[/folder.../file]`.
+Provide either `absolutePath` or `videoUrl`, not both. `absolutePath` must be a 7router absolute path in the format `Provider/account/bucket[/folder.../file]`.
 
 ## Queue API
 

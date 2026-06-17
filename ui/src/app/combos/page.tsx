@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TYPE_COLORS, TYPE_ABBR, TYPE_LABEL } from "@/lib/destination-types";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -33,27 +34,6 @@ type PublishDestination = {
 };
 
 /* ── Type → visual mapping ───────────────────────────────────────────────── */
-
-const TYPE_COLORS: Record<string, string> = {
-  youtube_channel: "bg-red-600",
-  facebook_page: "bg-blue-700",
-  tiktok_account: "bg-gray-800",
-  TelegramChat: "bg-sky-500",
-};
-
-const TYPE_ABBR: Record<string, string> = {
-  youtube_channel: "YT",
-  facebook_page: "FB",
-  tiktok_account: "TK",
-  TelegramChat: "TG",
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  youtube_channel: "YouTube Channel",
-  facebook_page: "Facebook Page",
-  tiktok_account: "TikTok",
-  TelegramChat: "Telegram Chat",
-};
 
 function DestBadge({ type }: { type: string }) {
   const bg = TYPE_COLORS[type] ?? "bg-gray-700";

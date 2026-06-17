@@ -6,8 +6,9 @@ import { accounts, groupDestinations, providers, destinations } from "@/infrastr
 import { createJob } from "@/infrastructure/jobs/job-service";
 import { startJobRunner } from "@/infrastructure/jobs/job-runner";
 import { getDestinationIconUrl } from "@/core/destination-icons";
+import { ProviderType } from "@/core/enums";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
-import { assertAbsolutePath, downloadFromStorage } from "../shared/storage-helper";
+import { assertAbsolutePath, downloadFromStorage, downloadFromUrl, isUrl } from "../shared/storage-helper";
 
 type UploadJobMetadata = {
   title?: string;
@@ -18,10 +19,13 @@ type UploadJobMetadata = {
 @Injectable()
 export class CreateGroupUploadJobsUseCase {
   async execute(groupId: string, input: CreateUploadJobsDto, baseUrl: string) {
-    assertAbsolutePath(input.absolutePath);
-
-    // Download from 7router once; all destination jobs share the temp file
-    const videoPath = await downloadFromStorage(input.absolutePath);
+    let videoPath: string;
+    if (input.videoUrl) {
+      videoPath = await downloadFromUrl(input.videoUrl);
+    } else {
+      assertAbsolutePath(input.absolutePath);
+      videoPath = await downloadFromStorage(input.absolutePath!);
+    }
     return this.createJobsForFile(groupId, videoPath, input, baseUrl);
   }
 
@@ -58,6 +62,7 @@ export class CreateGroupUploadJobsUseCase {
       if (!account) continue;
       const provider = await db.select().from(providers).where(eq(providers.id, account.providerId)).then((r) => r[0]);
       if (!provider) continue;
+      if (provider.type === ProviderType.telegram) continue;
 
       const job = await createJob({
         accountId: account.id,

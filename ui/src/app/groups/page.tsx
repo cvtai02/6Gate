@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getDestinationIconPath } from "@/lib/destination-icons";
+import { TYPE_COLORS, TYPE_ABBR } from "@/lib/destination-types";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -22,24 +23,6 @@ type Group = {
 };
 
 /* ── Visual helpers ─────────────────────────────────────────────────────── */
-
-const TYPE_COLORS: Record<string, string> = {
-  youtube_channel: "bg-red-600",
-  facebook_page: "bg-blue-700",
-  tiktok_account: "bg-gray-800",
-  instagram_account: "bg-gradient-to-br from-pink-500 via-red-500 to-yellow-400",
-  threads_profile: "bg-black",
-  TelegramChat: "bg-sky-500",
-};
-
-const TYPE_ABBR: Record<string, string> = {
-  youtube_channel: "YT",
-  facebook_page: "FB",
-  tiktok_account: "TK",
-  instagram_account: "IG",
-  threads_profile: "TH",
-  TelegramChat: "TG",
-};
 
 function DestBadge({ type, providerType }: { type: string; providerType?: string | null }) {
   const iconPath = getDestinationIconPath(type, providerType);
@@ -152,20 +135,19 @@ function CreateGroupModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 /* ── Group row ──────────────────────────────────────────────────────────── */
 
-function GroupRow({ group, onDelete }: { group: Group; onDelete: () => void }) {
+function GroupRow({ group }: { group: Group }) {
   const MAX_AVATARS = 7;
   const extra = Math.max(0, group.destinations.length - MAX_AVATARS);
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-5 py-4 flex items-center gap-4">
-      {/* Name + destinations */}
+    <Link
+      href={`/groups/${group.id}`}
+      className="rounded-xl border border-[var(--border)] bg-[var(--muted)] hover:border-gray-500 px-5 py-4 flex items-center gap-4 transition-colors block"
+    >
       <div className="flex-1 min-w-0">
-        <Link
-          href={`/groups/${group.id}`}
-          className="text-sm font-semibold text-white hover:text-indigo-300 transition-colors truncate block"
-        >
+        <span className="text-sm font-semibold text-white truncate block">
           {group.name}
-        </Link>
+        </span>
 
         {group.destinations.length === 0 ? (
           <p className="text-xs text-gray-600 mt-1">No destinations</p>
@@ -185,44 +167,18 @@ function GroupRow({ group, onDelete }: { group: Group; onDelete: () => void }) {
           </div>
         )}
       </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Link
-          href={`/groups/${group.id}`}
-          className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-gray-500 transition-colors"
-        >
-          Open
-        </Link>
-        <Link
-          href={`/groups/${group.id}/queue`}
-          className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-gray-500 transition-colors"
-        >
-          Queue
-        </Link>
-        <button
-          onClick={onDelete}
-          className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg border border-red-500/30 hover:border-red-400/50 transition-colors"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
+    </Link>
   );
 }
 
 function GroupRowSkeleton() {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-5 py-4 flex items-center gap-4 animate-pulse">
-      <div className="flex-1 space-y-2">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-5 py-4 animate-pulse">
+      <div className="space-y-2">
         <div className="h-4 w-36 bg-white/10 rounded" />
         <div className="flex gap-1.5">
           {[1, 2, 3].map((i) => <div key={i} className="w-6 h-6 rounded-md bg-white/10" />)}
         </div>
-      </div>
-      <div className="flex gap-2">
-        <div className="h-7 w-14 bg-white/5 rounded-lg border border-[var(--border)]" />
-        <div className="h-7 w-14 bg-white/5 rounded-lg border border-[var(--border)]" />
       </div>
     </div>
   );
@@ -243,12 +199,6 @@ export default function GroupsPage() {
   }
 
   useEffect(() => { load(); }, []);
-
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this group? This cannot be undone.")) return;
-    await fetch(`/api/groups/${id}`, { method: "DELETE" });
-    await load();
-  }
 
   return (
     <div className="p-8 flex flex-col gap-6 min-h-full">
@@ -294,11 +244,7 @@ export default function GroupsPage() {
       ) : (
         <div className="space-y-3">
           {groups.map((group) => (
-            <GroupRow
-              key={group.id}
-              group={group}
-              onDelete={() => handleDelete(group.id)}
-            />
+            <GroupRow key={group.id} group={group} />
           ))}
         </div>
       )}

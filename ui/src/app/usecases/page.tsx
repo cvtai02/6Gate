@@ -2,129 +2,28 @@
 
 import { useState } from "react";
 
-type UseCaseKey = "path" | "file" | "queue" | "queueFile";
+type UseCaseKey = "immediate" | "schedule";
 
 const BASE_URL_DEV = "http://localhost:20130";
 const BASE_URL_PROD = "https://6gate-api.minfect.com";
 
 const USE_CASES: { key: UseCaseKey; title: string; subtitle: string; markdown: string }[] = [
   {
-    key: "path",
-    title: "Immediate upload from storage path",
-    subtitle: "Send a 7router file path; the API downloads it and starts jobs",
-    markdown: `# 6Gate API instructions: immediate upload from storage path
+    key: "immediate",
+    title: "Immediate upload for a group",
+    subtitle: "Upload a video to all group destinations right now",
+    markdown: `# 6Gate API: Immediate upload for a group
 
-Use this when the video already exists in connected storage and the client can provide a 7router absolute file path. This path-based flow sends JSON only; it does not upload file bytes in the request.
-
-Base URL (dev):  ${BASE_URL_DEV}
-Base URL (prod): ${BASE_URL_PROD}
-
-## 1. Create jobs from a storage path
-
-\`\`\`http
-POST /api/groups/{groupId}/upload
-Content-Type: application/json
-\`\`\`
-
-\`\`\`json
-{
-  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
-  "title": "Optional title",
-  "caption": "Optional caption or description",
-  "privacy": "public"
-}
-\`\`\`
-
-Fields:
-- \`absolutePath\`: required 7router absolute path to a single video file.
-- \`title\`: optional.
-- \`caption\`: optional.
-- \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
-
-Successful response:
-
-\`\`\`json
-{
-  "groupId": "group_Ab3Xy7Zq",
-  "jobs": [
-    {
-      "id": "job_Kp2mNx4qRs",
-      "destinationId": "dest_Yz9wQv1b",
-      "destinationName": "My Channel",
-      "destinationIcon": "{baseUrl}/icons/youtube.svg",
-      "platform": "youtube",
-      "jobDetailsLink": "{baseUrl}/jobs/job_Kp2mNx4qRs",
-      "jobEventsLink": "{baseUrl}/api/post-jobs/job_Kp2mNx4qRs/events",
-      "jobCancelLink": "{baseUrl}/api/post-jobs/job_Kp2mNx4qRs/cancel"
-    }
-  ]
-}
-\`\`\`
-
-Each job uploads to one destination. Keep the source file in storage until the backend has downloaded it.
-
-## 3. Monitor each job with its own stream
-
-Open one EventSource per returned job using \`jobEventsLink\`.
-
-\`\`\`http
-GET /api/post-jobs/{jobId}/events
-Accept: text/event-stream
-\`\`\`
-
-\`\`\`js
-for (const job of jobs) {
-  const es = new EventSource(job.jobEventsLink);
-
-  es.addEventListener("log", (event) => {
-    const log = JSON.parse(event.data);
-    console.log(job.id, log.level, log.message);
-  });
-
-  es.addEventListener("status", (event) => {
-    const status = JSON.parse(event.data);
-    console.log(job.id, status.status);
-
-    if (["Published", "Failed", "Cancelled"].includes(status.status)) {
-      es.close();
-    }
-  });
-}
-\`\`\`
-
-Polling fallback:
-
-\`\`\`http
-GET /api/post-jobs/{jobId}
-\`\`\`
-
-Terminal statuses are \`Published\`, \`Failed\`, and \`Cancelled\`. Treat \`ReconnectRequired\` as needing user action.
-
-## 4. Retry failed jobs
-
-\`\`\`http
-POST /api/post-jobs/{jobId}/retry
-\`\`\`
-
-## 5. Cancel queued or active jobs
-
-\`\`\`http
-POST /api/post-jobs/{jobId}/cancel
-\`\`\`
-`,
-  },
-  {
-    key: "file",
-    title: "Immediate upload from file",
-    subtitle: "Send multipart file bytes; no storage path or directory needed",
-    markdown: `# 6Gate API instructions: immediate upload from file
-
-Use this when the client has the actual video file bytes. This file-based flow sends \`multipart/form-data\`; it does not require a 7router path, a server-readable path, or a directory.
+Upload a video to all destinations in a group immediately. Three input methods are supported: direct file upload, CDN/public URL, or 7router storage path.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
 
-## 1. Upload the file and create jobs
+---
+
+## Option A: Upload a file (multipart)
+
+Use when the client has the video file bytes.
 
 \`\`\`http
 POST /api/groups/{groupId}/upload-file
@@ -132,16 +31,16 @@ Content-Type: multipart/form-data
 \`\`\`
 
 Multipart fields:
-- \`file\`: required video file.
-- \`title\`: optional.
-- \`caption\`: optional.
-- \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
+- \`file\` (required): the video file.
+- \`title\` (optional): video title.
+- \`caption\` (optional): description or caption.
+- \`privacy\` (optional): \`public\`, \`unlisted\`, or \`private\`. Defaults to platform default.
 
 \`\`\`js
 const form = new FormData();
 form.set("file", fileInput.files[0]);
-form.set("title", "Optional title");
-form.set("caption", "Optional caption or description");
+form.set("title", "My Video");
+form.set("caption", "Check this out");
 form.set("privacy", "public");
 
 const res = await fetch("/api/groups/{groupId}/upload-file", {
@@ -151,7 +50,53 @@ const res = await fetch("/api/groups/{groupId}/upload-file", {
 const data = await res.json();
 \`\`\`
 
-Successful response:
+---
+
+## Option B: CDN / public URL
+
+Use when the video is hosted on a CDN or any publicly accessible URL.
+
+\`\`\`http
+POST /api/groups/{groupId}/upload
+Content-Type: application/json
+\`\`\`
+
+\`\`\`json
+{
+  "videoUrl": "https://cdn.example.com/videos/clip.mp4",
+  "title": "My Video",
+  "caption": "Check this out",
+  "privacy": "public"
+}
+\`\`\`
+
+The backend downloads the video from the URL, then publishes to all destinations.
+
+---
+
+## Option C: 7router storage path
+
+Use when the video exists in connected cloud storage (R2, S3, etc.) via 7router.
+
+\`\`\`http
+POST /api/groups/{groupId}/upload
+Content-Type: application/json
+\`\`\`
+
+\`\`\`json
+{
+  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
+  "title": "My Video",
+  "caption": "Check this out",
+  "privacy": "public"
+}
+\`\`\`
+
+The backend downloads the video from 7router, then publishes to all destinations.
+
+---
+
+## Response (all options)
 
 \`\`\`json
 {
@@ -172,42 +117,72 @@ Successful response:
 }
 \`\`\`
 
-The backend stores the uploaded file and keeps it available until all destination jobs have finished reading it.
+Each job uploads to one destination. All jobs in a batch share the same \`uploadBatchId\`.
 
-## 2. Monitor each job
+---
+
+## Monitor jobs
+
+**Server-Sent Events (preferred):**
 
 \`\`\`http
 GET /api/post-jobs/{jobId}/events
 Accept: text/event-stream
 \`\`\`
 
-Polling fallback:
+\`\`\`js
+for (const job of data.jobs) {
+  const es = new EventSource(job.jobEventsLink);
+
+  es.addEventListener("status", (event) => {
+    const { status } = JSON.parse(event.data);
+    console.log(job.id, status);
+    if (["Published", "Failed", "Cancelled"].includes(status)) es.close();
+  });
+
+  es.addEventListener("log", (event) => {
+    const { level, message } = JSON.parse(event.data);
+    console.log(job.id, level, message);
+  });
+}
+\`\`\`
+
+**Polling fallback:**
 
 \`\`\`http
 GET /api/post-jobs/{jobId}
 \`\`\`
 
-Terminal statuses are \`Published\`, \`Failed\`, and \`Cancelled\`.
+Terminal statuses: \`Published\`, \`Failed\`, \`Cancelled\`. Treat \`ReconnectRequired\` as needing user action.
+
+---
+
+## Retry / Cancel
+
+\`\`\`http
+POST /api/post-jobs/{jobId}/retry
+POST /api/post-jobs/{jobId}/cancel
+\`\`\`
 `,
   },
   {
-    key: "queue",
-    title: "Scheduled upload from storage path",
-    subtitle: "Queue a 7router file path for later scheduler dispatch",
-    markdown: `# 6Gate API instructions: scheduled upload from storage path
+    key: "schedule",
+    title: "Schedule for a group",
+    subtitle: "Queue a video for automatic dispatch at the group's scheduled time",
+    markdown: `# 6Gate API: Schedule for a group
 
-Use this when the video already exists in connected storage and the client can provide a 7router absolute file path. This path-based queue flow sends JSON only; the scheduler downloads the file later when the queue item dispatches.
+Queue a video to be published later at the group's configured daily upload time(s). Three input methods are supported: direct file upload, CDN/public URL, or 7router storage path.
 
 Base URL (dev):  ${BASE_URL_DEV}
 Base URL (prod): ${BASE_URL_PROD}
 
-## 1. Check when the next upload will fire
+---
+
+## Check when the next upload will fire
 
 \`\`\`http
 GET /api/groups/{groupId}/next-upload-time
 \`\`\`
-
-Response:
 
 \`\`\`json
 {
@@ -218,11 +193,64 @@ Response:
 }
 \`\`\`
 
-- \`nextUploadAt\` is \`null\` when the queue has no pending items — nothing will fire.
-- If \`nextUploadAt\` is in the past, the scheduler will dispatch within 30 seconds.
-- The upload time is configured by a moderator via \`PATCH /api/groups/{groupId}/queue-settings\`.
+- \`nextUploadAt\` is \`null\` when the queue is empty.
+- Upload times are configured via \`PATCH /api/groups/{groupId}/queue-settings\`.
 
-## 2. Add a storage-path item to the queue
+---
+
+## Option A: Queue a file (multipart)
+
+Use when the client has the video file bytes. The backend stores it and dispatches later.
+
+\`\`\`http
+POST /api/groups/{groupId}/queue-file
+Content-Type: multipart/form-data
+\`\`\`
+
+Multipart fields:
+- \`file\` (required): the video file.
+- \`title\` (optional): video title.
+- \`caption\` (optional): description or caption.
+- \`privacy\` (optional): \`public\`, \`unlisted\`, or \`private\`.
+
+\`\`\`js
+const form = new FormData();
+form.set("file", fileInput.files[0]);
+form.set("title", "My Video");
+form.set("privacy", "public");
+
+const res = await fetch("/api/groups/{groupId}/queue-file", {
+  method: "POST",
+  body: form,
+});
+const item = await res.json();
+\`\`\`
+
+---
+
+## Option B: Queue a CDN / public URL
+
+Use when the video is hosted on a CDN. The backend downloads it at dispatch time.
+
+\`\`\`http
+POST /api/groups/{groupId}/queue
+Content-Type: application/json
+\`\`\`
+
+\`\`\`json
+{
+  "videoUrl": "https://cdn.example.com/videos/clip.mp4",
+  "title": "My Video",
+  "caption": "Check this out",
+  "privacy": "public"
+}
+\`\`\`
+
+---
+
+## Option C: Queue a 7router storage path
+
+Use when the video exists in connected cloud storage via 7router.
 
 \`\`\`http
 POST /api/groups/{groupId}/queue
@@ -232,56 +260,69 @@ Content-Type: application/json
 \`\`\`json
 {
   "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
-  "title": "Optional title",
-  "caption": "Optional caption or description",
+  "title": "My Video",
+  "caption": "Check this out",
   "privacy": "public"
 }
 \`\`\`
 
-Fields:
-- \`absolutePath\`: required 7router absolute path to a single video file.
-- \`title\`, \`caption\`, \`privacy\`: optional metadata passed through to the upload job.
+---
 
-Response (201):
+## Response (all options, 201)
 
 \`\`\`json
 {
   "id": "gqueue_Kp2mNx4qRs",
   "groupId": "grp_abc123",
-  "absolutePath": "CloudflareR2/account/bucket/videos/clip.mp4",
-  "title": null,
-  "caption": null,
+  "absolutePath": "...",
+  "title": "My Video",
+  "caption": "Check this out",
   "privacy": "public",
   "status": "Pending",
   "uploadBatchId": null,
   "errorMessage": null,
   "createdAt": "...",
   "updatedAt": "...",
-  "queueLink": "http://localhost:20130/groups/grp_abc123/queue"
+  "queueLink": "{baseUrl}/groups/grp_abc123/queue"
 }
 \`\`\`
 
-Open \`queueLink\` in a browser to view and manage the queue for this group.
+---
 
-## 3. List the queue
+## Manage the queue
 
+**List items:**
 \`\`\`http
 GET /api/groups/{groupId}/queue
 \`\`\`
 
-Returns all items ordered by newest first. Filter by \`status\` client-side: \`Pending\`, \`Dispatched\`, \`Failed\`.
-
-## 4. Remove a pending item
-
+**Remove a pending item:**
 \`\`\`http
 DELETE /api/groups/{groupId}/queue/{itemId}
 \`\`\`
 
-Returns 204. Use this to cancel an item before it is dispatched.
+---
 
-## 5. Monitor the dispatched jobs
+## Configure schedule times
 
-When the scheduler dispatches an item it creates standard post-jobs (one per group destination). Poll or stream them the same way as a direct upload:
+\`\`\`http
+PATCH /api/groups/{groupId}/queue-settings
+Content-Type: application/json
+\`\`\`
+
+\`\`\`json
+{
+  "uploadTimesInDay": ["09:00", "18:00"]
+}
+\`\`\`
+
+Times are in local \`HH:mm\` format (API server timezone). One queue item dispatches per time slot per day.
+
+---
+
+## Monitor dispatched jobs
+
+When the scheduler dispatches a queue item, it creates standard post-jobs (one per group destination):
 
 \`\`\`http
 GET /api/post-jobs/{jobId}/events
@@ -293,85 +334,10 @@ GET /api/post-jobs/{jobId}
 \`\`\`
 
 Terminal statuses: \`Published\`, \`Failed\`, \`Cancelled\`.
-`,
-  },
-  {
-    key: "queueFile",
-    title: "Scheduled upload from file",
-    subtitle: "Upload multipart file bytes now and dispatch them later",
-    markdown: `# 6Gate API instructions: scheduled upload from file
-
-Use this when the client has the actual video file bytes and wants 6Gate to store them now, then publish later at the group's configured queue time. This file-based queue flow does not require a 7router path, a server-readable path, or a directory.
-
-Base URL (dev):  ${BASE_URL_DEV}
-Base URL (prod): ${BASE_URL_PROD}
-
-## 1. Upload a file into the queue
 
 \`\`\`http
-POST /api/groups/{groupId}/queue-file
-Content-Type: multipart/form-data
-\`\`\`
-
-Multipart fields:
-- \`file\`: required video file.
-- \`title\`: optional.
-- \`caption\`: optional.
-- \`privacy\`: optional, one of \`public\`, \`unlisted\`, or \`private\`.
-
-\`\`\`js
-const form = new FormData();
-form.set("file", fileInput.files[0]);
-form.set("title", "Optional title");
-form.set("caption", "Optional caption or description");
-form.set("privacy", "public");
-
-const res = await fetch("/api/groups/{groupId}/queue-file", {
-  method: "POST",
-  body: form,
-});
-const item = await res.json();
-\`\`\`
-
-Response (201):
-
-\`\`\`json
-{
-  "id": "gqueue_Kp2mNx4qRs",
-  "groupId": "grp_abc123",
-  "absolutePath": "C:/Users/.../AppData/Local/6Gate/uploads/temp/file.mp4",
-  "title": "Optional title",
-  "caption": "Optional caption or description",
-  "privacy": "public",
-  "status": "Pending",
-  "uploadBatchId": null,
-  "errorMessage": null,
-  "createdAt": "...",
-  "updatedAt": "...",
-  "queueLink": "http://localhost:20130/groups/grp_abc123/queue"
-}
-\`\`\`
-
-The queued item points to the backend-stored upload file. Keep the backend upload directory intact until the queue item dispatches.
-
-## 2. Check when the queue will dispatch
-
-\`\`\`http
-GET /api/groups/{groupId}/next-upload-time
-\`\`\`
-
-## 3. List or remove queued files
-
-\`\`\`http
-GET /api/groups/{groupId}/queue
-DELETE /api/groups/{groupId}/queue/{itemId}
-\`\`\`
-
-When the scheduler dispatches the item, it creates normal post-jobs. Monitor those jobs with:
-
-\`\`\`http
-GET /api/post-jobs/{jobId}/events
-GET /api/post-jobs/{jobId}
+POST /api/post-jobs/{jobId}/retry
+POST /api/post-jobs/{jobId}/cancel
 \`\`\`
 `,
   },
@@ -390,7 +356,7 @@ function downloadMarkdown(filename: string, content: string) {
 }
 
 export default function UseCasesPage() {
-  const [activeKey, setActiveKey] = useState<UseCaseKey>("path");
+  const [activeKey, setActiveKey] = useState<UseCaseKey>("immediate");
   const [copied, setCopied] = useState(false);
 
   const active = USE_CASES.find((uc) => uc.key === activeKey)!;
