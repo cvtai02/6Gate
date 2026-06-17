@@ -30,6 +30,13 @@ type BatchJob = {
   providerType: string | null;
 };
 
+type NotificationChannel = {
+  id: string;
+  chatId: string;
+  chatName: string | null;
+  botName: string | null;
+};
+
 type BatchDetail = {
   batchId: string;
   title: string | null;
@@ -38,6 +45,7 @@ type BatchDetail = {
   videoPath: string;
   createdAt: string;
   jobs: BatchJob[];
+  notificationChannels: NotificationChannel[];
 };
 
 export default async function BatchDetailPage({

@@ -35,46 +35,21 @@ type BatchJob = {
   providerType: string | null;
 };
 
+type NotificationChannel = {
+  id: string;
+  chatId: string;
+  chatName: string | null;
+  botName: string | null;
+};
+
 type Batch = {
   batchId: string;
   title: string | null;
   videoPath: string;
   createdAt: string;
   jobs: BatchJob[];
+  notificationChannels?: NotificationChannel[];
 };
-
-function UploadNode({ batch }: { batch: Batch }) {
-  const allDone = batch.jobs.every((j) => ["Published", "Failed", "Cancelled"].includes(j.status));
-  const anyUploading = batch.jobs.some((j) => ["Uploading", "Processing", "Initializing"].includes(j.status));
-  const status = anyUploading ? "Uploading" : allDone ? "Published" : "Created";
-  const color = STATUS_COLOR[status] ?? DEFAULT_COLOR;
-  const fileName = batch.videoPath.split(/[/\\]/).pop() ?? batch.videoPath;
-
-  return (
-    <div className={`rounded-xl border-2 ${color.border} ${color.bg} p-5 w-72 shrink-0`}>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-          <svg className="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-white">Upload Video</div>
-          <div className="text-[10px] text-gray-500">Source file</div>
-        </div>
-      </div>
-      <div className="text-xs text-gray-400 truncate font-mono" title={batch.videoPath}>
-        {fileName}
-      </div>
-      <div className="mt-3 flex items-center gap-1.5">
-        <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
-        <span className={`text-[11px] font-medium ${color.text}`}>
-          {anyUploading ? "In Progress" : allDone ? "Completed" : "Queued"}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 function DestinationNode({ job }: { job: BatchJob }) {
   const router = useRouter();
@@ -144,52 +119,99 @@ function DestinationNode({ job }: { job: BatchJob }) {
   );
 }
 
+function NotificationNode({ channels, allDone, anyFailed }: { channels: NotificationChannel[]; allDone: boolean; anyFailed: boolean }) {
+  const status = !allDone ? "Pending" : "Sent";
+  const color = !allDone
+    ? { border: "border-gray-500/40", bg: "bg-gray-500/5", text: "text-gray-400", dot: "bg-gray-400" }
+    : anyFailed
+      ? { border: "border-yellow-500/40", bg: "bg-yellow-500/5", text: "text-yellow-400", dot: "bg-yellow-400" }
+      : { border: "border-sky-500/40", bg: "bg-sky-500/5", text: "text-sky-400", dot: "bg-sky-400" };
+
+  return (
+    <div className={`rounded-xl border-2 ${color.border} ${color.bg} p-5 w-72 shrink-0`}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center">
+          <svg className="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-white">Notification</div>
+          <div className="text-[10px] text-gray-500">Telegram</div>
+        </div>
+      </div>
+      <div className="space-y-1">
+        {channels.map((ch) => (
+          <div key={ch.id} className="flex items-center gap-1.5 text-xs text-gray-400">
+            <img src="/icons/telegram.svg" alt="" className="w-3 h-3 opacity-60" />
+            <span className="truncate">{ch.chatName || ch.chatId}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center gap-1.5">
+        <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+        <span className={`text-[11px] font-medium ${color.text}`}>
+          {status}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function ProcessFlow({ batch }: { batch: Batch }) {
-  const uploadRef = useRef<HTMLDivElement>(null);
   const destRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const notifyRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<{ d: string; color: string; dashed: boolean }[]>([]);
   const [svgHeight, setSvgHeight] = useState(0);
 
+  const channels = batch.notificationChannels ?? [];
+  const hasNotify = channels.length > 0;
+  const allDone = batch.jobs.every((j) => ["Published", "Failed", "Cancelled"].includes(j.status));
+  const anyFailed = batch.jobs.some((j) => j.status === "Failed");
+
   useEffect(() => {
     const container = containerRef.current;
-    const upload = uploadRef.current;
     const svg = svgRef.current;
-    if (!container || !upload || !svg) return;
+    if (!container || !svg) return;
 
     const containerRect = container.getBoundingClientRect();
-    const uploadRect = upload.getBoundingClientRect();
-    const srcX = uploadRect.right - containerRect.left;
-    const srcY = uploadRect.top + uploadRect.height / 2 - containerRect.top;
-
     const newPaths: typeof paths = [];
     let maxBottom = 0;
 
-    destRefs.current.forEach((el, i) => {
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const dstX = r.left - containerRect.left;
-      const dstY = r.top + r.height / 2 - containerRect.top;
-      maxBottom = Math.max(maxBottom, r.bottom - containerRect.top);
+    if (hasNotify && notifyRef.current) {
+      const notifyRect = notifyRef.current.getBoundingClientRect();
+      const notifyX = notifyRect.left - containerRect.left;
+      const notifyY = notifyRect.top + notifyRect.height / 2 - containerRect.top;
+      maxBottom = Math.max(maxBottom, notifyRect.bottom - containerRect.top);
 
-      const job = batch.jobs[i];
-      const color =
-        job.status === "Published" ? "#22c55e" :
-        job.status === "Failed" ? "#ef4444" :
-        job.status === "Uploading" ? "#3b82f6" :
-        "#4b5563";
-      const midX = (srcX + dstX) / 2;
-      newPaths.push({
-        d: `M ${srcX} ${srcY} C ${midX} ${srcY}, ${midX} ${dstY}, ${dstX} ${dstY}`,
-        color,
-        dashed: ["Created", "Cancelled"].includes(job.status),
+      destRefs.current.forEach((el) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const destRightX = r.right - containerRect.left;
+        const destY = r.top + r.height / 2 - containerRect.top;
+        maxBottom = Math.max(maxBottom, r.bottom - containerRect.top);
+
+        const color = allDone ? "#0ea5e9" : "#4b5563";
+        const midX = (destRightX + notifyX) / 2;
+        newPaths.push({
+          d: `M ${destRightX} ${destY} C ${midX} ${destY}, ${midX} ${notifyY}, ${notifyX} ${notifyY}`,
+          color,
+          dashed: !allDone,
+        });
       });
-    });
+    } else {
+      destRefs.current.forEach((el) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        maxBottom = Math.max(maxBottom, r.bottom - containerRect.top);
+      });
+    }
 
-    setSvgHeight(Math.max(maxBottom, uploadRect.bottom - containerRect.top));
+    setSvgHeight(maxBottom);
     setPaths(newPaths);
-  }, [batch.jobs]);
+  }, [batch.jobs, hasNotify, allDone]);
 
   return (
     <div ref={containerRef} className="relative flex items-start gap-16">
@@ -213,11 +235,6 @@ export function ProcessFlow({ batch }: { batch: Batch }) {
         ))}
       </svg>
 
-      {/* Upload source node */}
-      <div className="flex flex-col justify-center self-center z-10" ref={uploadRef}>
-        <UploadNode batch={batch} />
-      </div>
-
       {/* Destination nodes */}
       <div className="flex flex-col gap-4 z-10">
         {batch.jobs.map((job, i) => (
@@ -226,6 +243,13 @@ export function ProcessFlow({ batch }: { batch: Batch }) {
           </div>
         ))}
       </div>
+
+      {/* Notification node */}
+      {hasNotify && (
+        <div className="flex flex-col justify-center self-center z-10" ref={notifyRef}>
+          <NotificationNode channels={channels} allDone={allDone} anyFailed={anyFailed} />
+        </div>
+      )}
     </div>
   );
 }

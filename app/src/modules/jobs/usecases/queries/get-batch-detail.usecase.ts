@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
-import { accounts, destinations, groups, postJobs, providers } from "@/infrastructure/db/schema";
+import { accounts, destinations, groups, groupNotificationChannels, postJobs, providers } from "@/infrastructure/db/schema";
 
 @Injectable()
 export class GetBatchDetailUseCase {
@@ -44,6 +44,27 @@ export class GetBatchDetailUseCase {
     if (jobs.length === 0) return null;
 
     const first = jobs[0];
+    const groupId = first.groupId;
+
+    let notificationChannels: { id: string; chatId: string; chatName: string | null; botName: string | null }[] = [];
+    if (groupId) {
+      const channels = await db.select().from(groupNotificationChannels).where(eq(groupNotificationChannels.groupId, groupId));
+      if (channels.length > 0) {
+        const accountIds = [...new Set(channels.map((c) => c.accountId))];
+        const accountRows = await db.select().from(accounts).where(inArray(accounts.id, accountIds));
+        const accountMap = new Map(accountRows.map((a) => [a.id, a]));
+        notificationChannels = channels.map((ch) => {
+          const acc = accountMap.get(ch.accountId);
+          return {
+            id: ch.id,
+            chatId: ch.chatId,
+            chatName: ch.chatName,
+            botName: acc?.displayName ?? acc?.username ?? null,
+          };
+        });
+      }
+    }
+
     return {
       batchId,
       title: first.title,
@@ -52,6 +73,7 @@ export class GetBatchDetailUseCase {
       videoPath: first.videoPath,
       createdAt: first.createdAt,
       jobs,
+      notificationChannels,
     };
   }
 }
