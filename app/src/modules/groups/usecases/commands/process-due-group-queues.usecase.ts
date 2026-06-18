@@ -1,10 +1,8 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
-import { groupUploadSettings, groups } from "@/infrastructure/db/schema";
+import { groupUploadSettings } from "@/infrastructure/db/schema";
 import { DispatchNextQueuedGroupUploadUseCase } from "./dispatch-next-queued-group-upload.usecase";
 import {
-  DEFAULT_UPLOAD_TIMES,
   groupSettingClaimWhere,
   localDateKey,
   localTimeKey,
@@ -35,7 +33,6 @@ export class ProcessDueGroupQueuesUseCase implements OnModuleInit {
     if (schedulerState.running) return;
     schedulerState.running = true;
     try {
-      await this.bootstrapMissingUploadSettings();
       const today = localDateKey();
       const nowTime = localTimeKey();
       const settings = await getDb().select().from(groupUploadSettings);
@@ -83,24 +80,4 @@ export class ProcessDueGroupQueuesUseCase implements OnModuleInit {
     void this.execute();
   }
 
-  private async bootstrapMissingUploadSettings() {
-    const db = getDb();
-    const allGroups = await db.select().from(groups);
-    for (const group of allGroups) {
-      const existing = await db
-        .select({ groupId: groupUploadSettings.groupId })
-        .from(groupUploadSettings)
-        .where(eq(groupUploadSettings.groupId, group.id))
-        .then((r) => r[0]);
-      if (existing) continue;
-      const now = new Date().toISOString();
-      await db.insert(groupUploadSettings).values({
-        groupId: group.id,
-        uploadTimeInDay: DEFAULT_UPLOAD_TIMES,
-        lastTriggeredDate: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-  }
 }

@@ -4,15 +4,12 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 
 ## Upload APIs
 
-Three video input methods are supported across all upload endpoints:
-- **File upload** (multipart `file` field)
-- **CDN URL** (`videoUrl` JSON field) — any publicly accessible video URL
+Two video input methods are supported:
+- **Video URL** (`videoUrl` JSON field) — Telegram video link, CDN URL, or any publicly accessible video URL
 - **7router storage path** (`absolutePath` JSON field)
 
 ### Immediate upload
 `POST /api/groups/:id/upload` — JSON body with `absolutePath` or `videoUrl`; downloads and immediately creates post jobs.
-
-`POST /api/groups/:id/upload-file` — multipart `file` upload; stores and immediately creates post jobs.
 
 **JSON body (either field):**
 ```json
@@ -27,8 +24,6 @@ Three video input methods are supported across all upload endpoints:
 
 ### Queue an upload
 `POST /api/groups/:id/queue` — JSON body with `absolutePath` or `videoUrl`; enqueued for scheduled dispatch.
-
-`POST /api/groups/:id/queue-file` — multipart `file` upload; stored and enqueued for scheduled dispatch.
 
 Provide either `absolutePath` or `videoUrl`, not both. `absolutePath` must be a 7router absolute path in the format `Provider/account/bucket[/folder.../file]`.
 

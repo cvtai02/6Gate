@@ -1,14 +1,18 @@
 import { Injectable } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "@/infrastructure/db";
-import { groupUploadQueue } from "@/infrastructure/db/schema";
+import { groupUploadQueue, groupUploadSettings } from "@/infrastructure/db/schema";
 import type { EnqueueGroupUploadDto } from "../../dtos/enqueue-group-upload.dto";
 import type { GroupUploadQueueItemDto } from "../../dtos/group-upload-queue.dto";
 import { ensureGroup, QUEUE_STATUS_PENDING } from "../shared/group-helpers";
 import { assertAbsolutePath, isUrl } from "../shared/storage-helper";
+import { DispatchNextQueuedGroupUploadUseCase } from "./dispatch-next-queued-group-upload.usecase";
 
 @Injectable()
 export class EnqueueGroupUploadUseCase {
+  constructor(private readonly dispatchNextQueued: DispatchNextQueuedGroupUploadUseCase) {}
+
   async execute(groupId: string, input: EnqueueGroupUploadDto): Promise<GroupUploadQueueItemDto> {
     await ensureGroup(groupId);
 
@@ -31,6 +35,16 @@ export class EnqueueGroupUploadUseCase {
       createdAt: now,
       updatedAt: now,
     });
+
+    const hasSchedule = await getDb()
+      .select({ groupId: groupUploadSettings.groupId })
+      .from(groupUploadSettings)
+      .where(eq(groupUploadSettings.groupId, groupId))
+      .then((r) => r[0]);
+
+    if (!hasSchedule) {
+      await this.dispatchNextQueued.execute(groupId).catch(() => undefined);
+    }
 
     return {
       id,

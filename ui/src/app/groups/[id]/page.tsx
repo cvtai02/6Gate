@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getDestinationIconPath } from "@/lib/destination-icons";
@@ -132,13 +132,6 @@ function DestAvatar({ type, avatarUrl, providerType, size = 8 }: { type: string;
     return <img src={avatarUrl} alt="" className={cls} onError={() => setErrored(true)} />;
   }
   return <DestBadge type={type} providerType={providerType} />;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 /* ── Add Destination Modal ──────────────────────────────────────────────── */
@@ -336,7 +329,7 @@ function JobProgressPanel({ jobs, onReset }: { jobs: JobResult[]; onReset: () =>
 
 /* ── Schedule Video Form ───────────────────────────────────────────────── */
 
-type InputMode = "file" | "url" | "storagePath";
+type InputMode = "url" | "storagePath";
 
 function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
   groupId: string;
@@ -344,8 +337,7 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
   onQueued: () => void;
   onUploaded: (jobs: JobResult[]) => void;
 }) {
-  const [inputMode, setInputMode] = useState<InputMode>("file");
-  const [file, setFile] = useState<File | null>(null);
+  const [inputMode, setInputMode] = useState<InputMode>("url");
   const [videoUrl, setVideoUrl] = useState("");
   const [storagePath, setStoragePath] = useState("");
   const [title, setTitle] = useState("");
@@ -353,35 +345,8 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
   const [privacy, setPrivacy] = useState<"public" | "private" | "unlisted">("public");
   const [submitting, setSubmitting] = useState<"queue" | "upload" | null>(null);
   const [error, setError] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const hasInput = inputMode === "file" ? !!file : inputMode === "url" ? videoUrl.trim() : storagePath.trim();
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped?.type.startsWith("video/")) {
-      setFile(dropped);
-      setInputMode("file");
-    }
-  }
-
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = e.target.files?.[0];
-    if (selected) { setFile(selected); setInputMode("file"); }
-  }
-
-  function buildFormData(): FormData {
-    const fd = new FormData();
-    fd.append("file", file!);
-    if (title.trim()) fd.append("title", title.trim());
-    if (caption.trim()) fd.append("caption", caption.trim());
-    fd.append("privacy", privacy);
-    return fd;
-  }
+  const hasInput = inputMode === "url" ? videoUrl.trim() : storagePath.trim();
 
   function buildJsonBody(): string {
     const body: Record<string, string | undefined> = {
@@ -394,43 +359,19 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
     return JSON.stringify(body);
   }
 
-  async function submitWithXhr(url: string, fd: FormData): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", url);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        setUploadProgress(null);
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (xhr.status >= 400) reject(new Error(data.error ?? `HTTP ${xhr.status}`));
-          else resolve(data);
-        } catch { reject(new Error(`HTTP ${xhr.status}`)); }
-      };
-      xhr.onerror = () => { setUploadProgress(null); reject(new Error("Network error")); };
-      xhr.send(fd);
-    });
-  }
-
   async function handleQueue(e: React.FormEvent) {
     e.preventDefault();
     if (!hasInput) return;
     setSubmitting("queue");
     setError("");
     try {
-      if (inputMode === "file") {
-        await submitWithXhr(`/api/groups/${groupId}/queue-file`, buildFormData());
-      } else {
-        const res = await fetch(`/api/groups/${groupId}/queue`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: buildJsonBody(),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Failed");
-      }
+      const res = await fetch(`/api/groups/${groupId}/queue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: buildJsonBody(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed");
       reset();
       onQueued();
     } catch (err) {
@@ -446,18 +387,13 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
     setSubmitting("upload");
     setError("");
     try {
-      let data: Record<string, unknown>;
-      if (inputMode === "file") {
-        data = (await submitWithXhr(`/api/groups/${groupId}/upload-file`, buildFormData())) as Record<string, unknown>;
-      } else {
-        const res = await fetch(`/api/groups/${groupId}/upload`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: buildJsonBody(),
-        });
-        data = await res.json();
-        if (!res.ok) throw new Error((data as { error?: string }).error ?? "Failed");
-      }
+      const res = await fetch(`/api/groups/${groupId}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: buildJsonBody(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Failed");
       const jobs = ((data.jobs ?? []) as { id: string; destinationId: string; destinationName: string; platform: string }[]).map((j) => ({
         ...j,
         status: "Created" as const,
@@ -471,20 +407,16 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
   }
 
   function reset() {
-    setFile(null);
     setVideoUrl("");
     setStoragePath("");
     setTitle("");
     setCaption("");
     setPrivacy("public");
     setError("");
-    setUploadProgress(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   const modeLabels: { mode: InputMode; label: string }[] = [
-    { mode: "file", label: "File" },
-    { mode: "url", label: "CDN URL" },
+    { mode: "url", label: "CDN / Telegram URL" },
     { mode: "storagePath", label: "Storage Path" },
   ];
 
@@ -505,59 +437,12 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
               inputMode === mode
                 ? "bg-indigo-500/20 text-indigo-300"
                 : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-            } ${mode !== "file" ? "border-l border-[var(--border)]" : ""}`}
+            } ${mode !== "url" ? "border-l border-[var(--border)]" : ""}`}
           >
             {label}
           </button>
         ))}
       </div>
-
-      {/* File input zone */}
-      {inputMode === "file" && (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`relative cursor-pointer rounded-xl border-2 border-dashed transition-all ${
-            dragOver
-              ? "border-indigo-500 bg-indigo-500/10"
-              : file
-              ? "border-green-500/40 bg-green-500/5"
-              : "border-[var(--border)] hover:border-gray-500 bg-black/20"
-          } ${file ? "px-4 py-3" : "px-4 py-8"}`}
-        >
-          <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileSelect} className="hidden" />
-          {file ? (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-white truncate">{file.name}</p>
-                <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                className="text-gray-500 hover:text-red-400 text-xs px-2 py-1 transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <div className="text-center">
-              <svg className="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <p className="text-sm text-gray-400">Drop a video file here or <span className="text-indigo-400">browse</span></p>
-              <p className="text-xs text-gray-600 mt-1">MP4, MOV, AVI, MKV, WebM</p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* CDN URL input */}
       {inputMode === "url" && (
@@ -584,16 +469,6 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
             className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
           />
           <p className="text-[11px] text-gray-600 mt-1">7router absolute path to the video file in cloud storage.</p>
-        </div>
-      )}
-
-      {/* Upload progress bar */}
-      {uploadProgress !== null && (
-        <div className="space-y-1">
-          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
-          </div>
-          <p className="text-xs text-gray-500 text-right">{uploadProgress}%</p>
         </div>
       )}
 

@@ -289,6 +289,13 @@ export async function runMigrations() {
     ON CONFLICT (id) DO NOTHING
   `);
 
+  // Clear legacy columns so the migration above doesn't re-insert deleted rows on next restart
+  await run(`
+    UPDATE combos
+    SET telegram_bot_account_id = NULL, telegram_chat_id = NULL
+    WHERE telegram_bot_account_id IS NOT NULL
+  `);
+
   // Remove settings that don't belong here.
   await run(
     `DELETE FROM settings WHERE key IN ('dataDir','dbPath','uploadsDir','logsDir','configDir','port','zernioBaseUrl','storageAccessToken','storageBaseDirectory')`,
