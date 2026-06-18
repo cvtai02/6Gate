@@ -3,4 +3,6 @@ export interface EnqueueGroupUploadDto {
   title?: string;
   caption?: string;
   privacy?: string;
+  sourceChatId?: string;
+  sourceAccountId?: string;
 }

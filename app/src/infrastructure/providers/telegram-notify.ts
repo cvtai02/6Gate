@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
-import { accounts, groupNotificationChannels, postJobs } from "@/infrastructure/db/schema";
+import { accounts, groupNotificationChannels, groupUploadQueue, postJobs } from "@/infrastructure/db/schema";
 import { telegramRequest } from "@/modules/accounts/usecases/shared/telegram-helpers";
+import { decryptValue } from "@/core/security/crypto";
+import { env } from "@/infrastructure/config/env";
 import { PublishStatus } from "@/core/enums";
 
 export async function notifyTelegramIfConfigured(uploadBatchId: string) {
@@ -17,9 +19,6 @@ export async function notifyTelegramIfConfigured(uploadBatchId: string) {
 
   const groupId = batchJobs[0].groupId;
   if (!groupId) return;
-
-  const channels = await db.select().from(groupNotificationChannels).where(eq(groupNotificationChannels.groupId, groupId));
-  if (channels.length === 0) return;
 
   const published = batchJobs.filter((j) => j.status === PublishStatus.Published);
   const failed = batchJobs.filter((j) => j.status === PublishStatus.Failed);
@@ -51,20 +50,42 @@ export async function notifyTelegramIfConfigured(uploadBatchId: string) {
 
   const text = lines.join("\n");
 
+  const queueItem = await db
+    .select({ sourceChatId: groupUploadQueue.sourceChatId, sourceAccountId: groupUploadQueue.sourceAccountId })
+    .from(groupUploadQueue)
+    .where(eq(groupUploadQueue.uploadBatchId, uploadBatchId))
+    .then((r) => r[0]);
+
+  if (queueItem?.sourceChatId && queueItem?.sourceAccountId) {
+    const account = await db.select().from(accounts).where(eq(accounts.id, queueItem.sourceAccountId)).then((r) => r[0]);
+    if (account?.accessToken) {
+      const botToken = decryptValue(account.accessToken, env.encryptionKey);
+      try {
+        await telegramRequest(botToken, "sendMessage", {
+          chat_id: queueItem.sourceChatId,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        });
+      } catch {}
+    }
+    return;
+  }
+
+  const channels = await db.select().from(groupNotificationChannels).where(eq(groupNotificationChannels.groupId, groupId));
   for (const channel of channels) {
     const account = await db.select().from(accounts).where(eq(accounts.id, channel.accountId)).then((r) => r[0]);
     if (!account?.accessToken) continue;
 
+    const botToken = decryptValue(account.accessToken, env.encryptionKey);
     try {
-      await telegramRequest(account.accessToken, "sendMessage", {
+      await telegramRequest(botToken, "sendMessage", {
         chat_id: channel.chatId,
         text,
         parse_mode: "HTML",
         disable_web_page_preview: true,
       });
-    } catch {
-      // Notification is best-effort; don't break the upload flow.
-    }
+    } catch {}
   }
 }
 

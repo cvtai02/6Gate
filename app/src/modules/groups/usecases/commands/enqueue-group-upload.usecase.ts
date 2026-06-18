@@ -30,6 +30,8 @@ export class EnqueueGroupUploadUseCase {
       status: QUEUE_STATUS_PENDING,
       uploadBatchId: null,
       errorMessage: null,
+      sourceChatId: input.sourceChatId ?? null,
+      sourceAccountId: input.sourceAccountId ?? null,
       createdAt: now,
       updatedAt: now,
     });

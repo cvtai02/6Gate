@@ -152,6 +152,8 @@ export const groupUploadQueue = pgTable("group_upload_queue", {
   status: text("status").notNull(),
   uploadBatchId: text("upload_batch_id"),
   errorMessage: text("error_message"),
+  sourceChatId: text("source_chat_id"),
+  sourceAccountId: text("source_account_id"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

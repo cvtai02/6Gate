@@ -179,6 +179,8 @@ export async function runMigrations() {
 
   // Drop scheduled_at from group_upload_queue — dispatch timing is controlled by upload_time_in_day
   await run(`ALTER TABLE group_upload_queue DROP COLUMN IF EXISTS scheduled_at`);
+  await run(`ALTER TABLE group_upload_queue ADD COLUMN IF NOT EXISTS source_chat_id TEXT`);
+  await run(`ALTER TABLE group_upload_queue ADD COLUMN IF NOT EXISTS source_account_id TEXT`);
 
   await run(`
     CREATE TABLE IF NOT EXISTS group_upload_settings (

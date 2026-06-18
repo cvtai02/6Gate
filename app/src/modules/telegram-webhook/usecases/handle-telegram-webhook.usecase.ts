@@ -69,13 +69,15 @@ export class HandleTelegramWebhookUseCase {
 
     if (channels.length === 0) return;
 
-    const localPath = await downloadTelegramFile(botToken, video.file_id);
+    const localPath = await downloadTelegramFile(botToken, video!.file_id);
 
     for (const channel of channels) {
       await this.enqueue.execute(channel.groupId, {
         videoUrl: localPath,
-        title,
-        caption,
+        title: title!,
+        caption: caption!,
+        sourceChatId: String(message.chat.id),
+        sourceAccountId: accountId,
       });
 
       const pendingCount = await db
@@ -87,7 +89,7 @@ export class HandleTelegramWebhookUseCase {
       await this.reply(
         botToken,
         message.chat.id,
-        `📥 <b>${escapeHtml(title)}</b> queued (#${pendingCount} in queue)`,
+        `📥 <b>${escapeHtml(title!)}</b> queued (#${pendingCount} in queue)`,
       );
     }
   }
