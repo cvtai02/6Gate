@@ -310,7 +310,6 @@ export class FacebookAdapter implements SocialProviderAdapter {
       upload_session_id: uploadSessionId,
       access_token: pageToken,
     });
-    if (input.title) finishBody.append("title", input.title);
     if (input.caption) finishBody.append("description", input.caption);
     finishBody.append(
       "privacy",

@@ -253,7 +253,7 @@ export class TikTokAdapter implements SocialProviderAdapter {
         },
         body: JSON.stringify({
           post_info: {
-            title: input.title ?? "",
+            title: input.caption ?? "",
             privacy_level: PRIVACY_MAP[input.privacy ?? "private"] ?? "SELF_ONLY",
             disable_duet: false,
             disable_comment: false,
