@@ -44,20 +44,19 @@ export class HandleTelegramWebhookUseCase {
     const botToken = decryptValue(account.accessToken, env.encryptionKey);
 
     const video = message.video ?? this.extractVideoDocument(message.document);
-    const lines = text.split("\n").map((l) => l.trim());
-    const title = lines[1] || undefined;
-    const caption = lines.slice(2).join("\n").trim() || undefined;
+    const title = text.match(/@title:\s*(.+)/i)?.[1]?.trim() || undefined;
+    const caption = text.match(/@caption:\s*(.+)/i)?.[1]?.trim() || undefined;
 
     const missing: string[] = [];
     if (!video) missing.push("video");
-    if (!title) missing.push("title");
-    if (!caption) missing.push("caption");
+    if (!title) missing.push("@title:");
+    if (!caption) missing.push("@caption:");
 
     if (missing.length > 0) {
       await this.reply(
         botToken,
         message.chat.id,
-        `⚠️ /queue requires: ${missing.join(", ")}\n\nFormat:\n/queue\ntitle\ncaption`,
+        `⚠️ /queue requires: ${missing.join(", ")}\n\nFormat:\n/queue\n@title: video title\n@caption: description #tags`,
       );
       return;
     }
