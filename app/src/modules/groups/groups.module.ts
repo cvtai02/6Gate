@@ -53,5 +53,6 @@ import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
     ListGroupQueueUseCase,
     ListGroupsUseCase,
   ],
+  exports: [EnqueueGroupUploadUseCase],
 })
 export class GroupsModule {}

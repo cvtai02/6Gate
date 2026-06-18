@@ -603,7 +603,7 @@ function AddNotificationChannelModal({
     >
       <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-sm font-semibold text-white">Add Notification Channel</h2>
+          <h2 className="text-sm font-semibold text-white">Add Telegram Group</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -708,7 +708,7 @@ function NotificationChannelsCard({
         />
       )}
       <div className="px-4 py-3 border-b border-[var(--border)] flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Notifications</h3>
+        <h3 className="text-xs font-semibold text-white uppercase tracking-wide">Telegram Group</h3>
         <button
           onClick={() => setShowAdd(true)}
           className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -718,12 +718,12 @@ function NotificationChannelsCard({
       </div>
       {channels.length === 0 ? (
         <div className="p-4 text-center">
-          <p className="text-xs text-gray-500">No notification channels</p>
+          <p className="text-xs text-gray-500">No Telegram groups</p>
           <button
             onClick={() => setShowAdd(true)}
             className="text-xs text-indigo-400 hover:text-indigo-300 mt-2 transition-colors"
           >
-            + Add Channel
+            + Add Group
           </button>
         </div>
       ) : (

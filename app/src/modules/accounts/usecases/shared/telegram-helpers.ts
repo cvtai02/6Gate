@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import { NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -85,6 +88,22 @@ export async function getTelegramAccountOrThrow(accountId: string) {
   if (!provider || provider.type !== ProviderType.telegram) throw new Error("Account is not a Telegram bot account");
   if (!account.accessToken) throw new Error("Telegram bot token is missing from the account");
   return account;
+}
+
+export async function downloadTelegramFile(botToken: string, fileId: string): Promise<string> {
+  const file = await telegramRequest<{ file_id: string; file_path?: string }>(botToken, "getFile", { file_id: fileId });
+  if (!file.file_path) throw new Error("Telegram getFile did not return a file_path");
+
+  const url = `https://api.telegram.org/file/bot${botToken}/${file.file_path}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download Telegram file (HTTP ${res.status})`);
+
+  const ext = file.file_path.includes(".") ? file.file_path.slice(file.file_path.lastIndexOf(".")) : ".video";
+  const tempDir = join(tmpdir(), "6gate-uploads");
+  await mkdir(tempDir, { recursive: true });
+  const tempPath = join(tempDir, `${nanoid(10)}${ext}`);
+  await writeFile(tempPath, Buffer.from(await res.arrayBuffer()));
+  return tempPath;
 }
 
 export async function upsertTelegramChatDestination(accountId: string, chat: TelegramChatInfo, preferredName?: string) {

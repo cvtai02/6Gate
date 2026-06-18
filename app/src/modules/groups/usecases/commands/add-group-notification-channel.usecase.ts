@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "@/infrastructure/db";
 import { accounts, groups, groupNotificationChannels } from "@/infrastructure/db/schema";
+import { telegramRequest } from "@/modules/accounts/usecases/shared/telegram-helpers";
+import { decryptValue } from "@/core/security/crypto";
+import { env } from "@/infrastructure/config/env";
 
 @Injectable()
 export class AddGroupNotificationChannelUseCase {
@@ -24,6 +27,17 @@ export class AddGroupNotificationChannelUseCase {
       chatName: input.chatName ?? null,
       createdAt: now,
     });
+
+    if (account.accessToken) {
+      const botToken = decryptValue(account.accessToken, env.encryptionKey);
+      const webhookUrl = `${env.webhookBaseUrl}/api/webhooks/telegram/${input.accountId}`;
+      try {
+        await telegramRequest(botToken, "setWebhook", {
+          url: webhookUrl,
+          allowed_updates: ["message"],
+        });
+      } catch {}
+    }
 
     return {
       id,

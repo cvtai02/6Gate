@@ -15,4 +15,5 @@ export const env = {
   uploadsDir: path.join(dataDir, "uploads", "temp"),
   logsDir: path.join(dataDir, "logs"),
   configDir: path.join(dataDir, "config"),
+  webhookBaseUrl: process.env.WEBHOOK_BASE_URL || "https://6gate-api.minfect.com",
 };

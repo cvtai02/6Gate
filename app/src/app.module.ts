@@ -7,6 +7,8 @@ import { DestinationsModule } from "./modules/destinations/destinations.module";
 import { GroupsModule } from "./modules/groups/groups.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { OauthModule } from "./modules/oauth/oauth.module";
+import { TelegramWebhookModule } from "./modules/telegram-webhook/telegram-webhook.module";
+
 @Module({
   imports: [
     AuthModule,
@@ -17,6 +19,7 @@ import { OauthModule } from "./modules/oauth/oauth.module";
     GroupsModule,
     JobsModule,
     OauthModule,
+    TelegramWebhookModule,
   ],
 })
 export class AppModule {}
