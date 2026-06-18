@@ -12,6 +12,27 @@ type ScheduleItem = {
   lastTriggeredDate: string | null;
 };
 
+type HistoryJob = {
+  id: string;
+  status: string;
+  providerPostUrl: string | null;
+  errorMessage: string | null;
+  destinationName: string | null;
+  destinationType: string | null;
+  destinationIcon: string | null;
+};
+
+type HistoryBatch = {
+  id: string;
+  groupId: string | null;
+  groupName: string | null;
+  title: string | null;
+  videoPath: string | null;
+  createdAt: string;
+  updatedAt: string;
+  jobs: HistoryJob[];
+};
+
 const GROUP_COLORS = [
   { bg: "bg-indigo-500/20", border: "border-indigo-500/40", text: "text-indigo-300", dot: "bg-indigo-400" },
   { bg: "bg-emerald-500/20", border: "border-emerald-500/40", text: "text-emerald-300", dot: "bg-emerald-400" },
@@ -22,6 +43,16 @@ const GROUP_COLORS = [
   { bg: "bg-orange-500/20", border: "border-orange-500/40", text: "text-orange-300", dot: "bg-orange-400" },
   { bg: "bg-pink-500/20", border: "border-pink-500/40", text: "text-pink-300", dot: "bg-pink-400" },
 ];
+
+const HISTORY_STATUS_DOT: Record<string, string> = {
+  Published: "bg-green-400",
+  Failed: "bg-red-400",
+  Cancelled: "bg-gray-500",
+  Created: "bg-yellow-400",
+  Uploading: "bg-indigo-400",
+  Processing: "bg-indigo-400",
+  Retrying: "bg-amber-400",
+};
 
 function getWeekDays(baseDate: Date): Date[] {
   const start = new Date(baseDate);
@@ -63,6 +94,17 @@ function formatTime12h(time: string): string {
   return `${hour12}:${String(m).padStart(2, "0")} ${suffix}`;
 }
 
+function dateDayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function batchStatusDot(batch: HistoryBatch): string {
+  if (batch.jobs.some((j) => j.status === "Failed")) return "bg-red-400";
+  if (batch.jobs.every((j) => j.status === "Published")) return "bg-green-400";
+  if (batch.jobs.some((j) => ["Uploading", "Processing", "Initializing", "Finishing", "Retrying"].includes(j.status))) return "bg-indigo-400 animate-pulse";
+  return "bg-yellow-400";
+}
+
 function getDispatchSlots(schedule: ScheduleItem, weekDays: Date[]): Set<string> {
   const slots = new Set<string>();
   if (!schedule.nextUploadAt || schedule.pendingCount <= 0 || schedule.uploadTimesInDay.length === 0) return slots;
@@ -77,7 +119,7 @@ function getDispatchSlots(schedule: ScheduleItem, weekDays: Date[]): Set<string>
   cursor.setHours(0, 0, 0, 0);
 
   while (remaining > 0 && cursor <= weekEnd) {
-    const dayStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    const dayStr = dateDayKey(cursor);
     for (const time of sortedTimes) {
       if (remaining <= 0) break;
       const [h, m] = time.split(":").map(Number);
@@ -98,18 +140,27 @@ const HOUR_HEIGHT = 60;
 
 export default function SchedulePage() {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string> | null>(null);
 
   useEffect(() => {
-    fetch("/api/schedules")
-      .then((r) => {
+    Promise.all([
+      fetch("/api/schedules").then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
+      }),
+      fetch("/api/history?limit=500").then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }),
+    ])
+      .then(([sched, hist]) => {
+        setSchedules(sched);
+        setHistoryBatches(hist.batches ?? []);
       })
-      .then(setSchedules)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -117,20 +168,49 @@ export default function SchedulePage() {
   const baseDate = new Date();
   baseDate.setDate(baseDate.getDate() + weekOffset * 7);
   const weekDays = getWeekDays(baseDate);
+  const weekDayKeys = new Set(weekDays.map(dateDayKey));
 
   const schedulesWithQueue = schedules.filter((s) => s.pendingCount > 0);
 
+  const allGroupIds = new Set<string>();
+  schedulesWithQueue.forEach((s) => allGroupIds.add(s.groupId));
+  historyBatches.forEach((b) => { if (b.groupId) allGroupIds.add(b.groupId); });
+
   const groupColors = new Map<string, (typeof GROUP_COLORS)[number]>();
-  schedulesWithQueue.forEach((s, i) => groupColors.set(s.groupId, GROUP_COLORS[i % GROUP_COLORS.length]));
+  let colorIdx = 0;
+  for (const gid of allGroupIds) {
+    groupColors.set(gid, GROUP_COLORS[colorIdx % GROUP_COLORS.length]);
+    colorIdx++;
+  }
 
   const activeSchedules = selectedGroupIds
     ? schedulesWithQueue.filter((s) => selectedGroupIds.has(s.groupId))
     : schedulesWithQueue;
 
+  const activeHistory = selectedGroupIds
+    ? historyBatches.filter((b) => b.groupId && selectedGroupIds.has(b.groupId))
+    : historyBatches;
+
+  // Group history batches by day key for the current week
+  const historyByDay = new Map<string, HistoryBatch[]>();
+  for (const batch of activeHistory) {
+    const d = new Date(batch.createdAt);
+    const key = dateDayKey(d);
+    if (!weekDayKeys.has(key)) continue;
+    const list = historyByDay.get(key) ?? [];
+    list.push(batch);
+    historyByDay.set(key, list);
+  }
+
+  // Collect all group names for the legend
+  const allGroupNames = new Map<string, string>();
+  schedulesWithQueue.forEach((s) => allGroupNames.set(s.groupId, s.groupName));
+  historyBatches.forEach((b) => { if (b.groupId && b.groupName) allGroupNames.set(b.groupId, b.groupName); });
+
   function toggleGroup(groupId: string) {
     setSelectedGroupIds((prev) => {
       if (prev === null) {
-        const next = new Set(schedulesWithQueue.map((s) => s.groupId));
+        const next = new Set(allGroupIds);
         next.delete(groupId);
         return next;
       }
@@ -140,12 +220,13 @@ export default function SchedulePage() {
       } else {
         next.add(groupId);
       }
-      if (next.size === schedulesWithQueue.length) return null;
+      if (next.size === allGroupIds.size) return null;
       return next;
     });
   }
 
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const hasContent = activeSchedules.length > 0 || activeHistory.length > 0;
 
   return (
     <div className="p-8 space-y-6">
@@ -174,7 +255,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Legend — click to toggle filter */}
-      {schedulesWithQueue.length > 0 && (
+      {allGroupNames.size > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-500 mr-1">Filter:</span>
           <button
@@ -187,13 +268,13 @@ export default function SchedulePage() {
           >
             All
           </button>
-          {schedulesWithQueue.map((s) => {
-            const c = groupColors.get(s.groupId)!;
-            const isActive = selectedGroupIds === null || selectedGroupIds.has(s.groupId);
+          {[...allGroupNames.entries()].map(([gid, name]) => {
+            const c = groupColors.get(gid)!;
+            const isActive = selectedGroupIds === null || selectedGroupIds.has(gid);
             return (
               <button
-                key={s.groupId}
-                onClick={() => toggleGroup(s.groupId)}
+                key={gid}
+                onClick={() => toggleGroup(gid)}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all ${
                   isActive
                     ? `${c.bg} ${c.text} ${c.border}`
@@ -201,8 +282,7 @@ export default function SchedulePage() {
                 }`}
               >
                 <span className={`h-2 w-2 rounded-full ${isActive ? c.dot : "bg-gray-600"}`} />
-                {s.groupName}
-                <span className="text-[10px] opacity-70">({s.pendingCount})</span>
+                {name}
               </button>
             );
           })}
@@ -212,14 +292,14 @@ export default function SchedulePage() {
       {loading && <p className="text-sm text-gray-500">Loading schedule...</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      {!loading && !error && activeSchedules.length === 0 && (
+      {!loading && !error && !hasContent && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-10 text-center">
-          <p className="text-sm text-gray-500">No scheduled uploads.</p>
+          <p className="text-sm text-gray-500">No scheduled uploads or history.</p>
           <p className="text-xs text-gray-600 mt-1">Add items to a group's queue to see them on the calendar.</p>
         </div>
       )}
 
-      {!loading && !error && activeSchedules.length > 0 && (
+      {!loading && !error && hasContent && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] overflow-hidden">
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-[var(--border)]">
             <div className="p-2" />
@@ -252,6 +332,9 @@ export default function SchedulePage() {
             {/* Day columns */}
             {weekDays.map((day, dayIdx) => {
               const todayCol = isToday(day);
+              const dayStr = dateDayKey(day);
+              const dayHistory = historyByDay.get(dayStr) ?? [];
+
               return (
                 <div key={dayIdx} className={`relative border-l border-[var(--border)] ${todayCol ? "bg-indigo-500/[.02]" : ""}`}>
                   {/* Hour grid lines */}
@@ -274,9 +357,45 @@ export default function SchedulePage() {
                     </div>
                   )}
 
-                  {/* Schedule slots — only show blocks where a dispatch will actually happen */}
+                  {/* History batches — show as cards at their creation time */}
                   {(() => {
-                    const dayStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+                    const blockH = 34;
+                    const gap = 2;
+                    const stride = blockH + gap;
+                    // Anchor at the earliest batch's time, stack the rest below
+                    const sorted = [...dayHistory].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+                    const anchorMins = sorted.length > 0 ? (() => { const d = new Date(sorted[0].createdAt); return d.getHours() * 60 + d.getMinutes(); })() : 0;
+                    const anchorTop = (anchorMins / 60) * HOUR_HEIGHT;
+
+                    return sorted.map((batch, idx) => {
+                      const created = new Date(batch.createdAt);
+                      const c = batch.groupId ? groupColors.get(batch.groupId) : null;
+                      const statusDot = batchStatusDot(batch);
+                      const label = [batch.groupName, batch.title].filter(Boolean).join(" - ") || "Upload";
+                      const timeStr = created.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <Link
+                          key={batch.id}
+                          href={`/schedule/batch/${batch.id}`}
+                          className={`absolute left-1 right-1 z-10 rounded-md border px-1.5 py-0.5 flex flex-col justify-center hover:opacity-80 transition-opacity ${
+                            c ? `${c.bg} ${c.border} ${c.text}` : "bg-gray-500/20 border-gray-500/40 text-gray-300"
+                          }`}
+                          style={{ top: anchorTop + idx * stride, height: blockH }}
+                          title={`${label}\n${batch.jobs.length} job${batch.jobs.length !== 1 ? "s" : ""} — ${timeStr}`}
+                        >
+                          <span className="flex items-center gap-1 text-[10px] leading-none truncate">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDot}`} />
+                            <span className="truncate">{label}</span>
+                          </span>
+                          <span className="text-[9px] opacity-60 ml-3 leading-none mt-0.5">{timeStr}</span>
+                        </Link>
+                      );
+                    });
+                  })()}
+
+                  {/* Future schedule slots */}
+                  {(() => {
                     const slotGroups = new Map<string, { s: ScheduleItem; idx: number }[]>();
                     activeSchedules.forEach((s) => {
                       if (!s.nextUploadAt || s.pendingCount <= 0) return;
@@ -297,12 +416,12 @@ export default function SchedulePage() {
                         return (
                           <Link
                             key={`${s.groupId}-${time}`}
-                            href={`/groups/${s.groupId}/queue`}
-                            className={`absolute left-1 right-1 z-10 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight truncate hover:opacity-80 transition-opacity ${c.bg} ${c.border} ${c.text}`}
+                            href={`/groups/${s.groupId}`}
+                            className={`absolute left-1 right-1 z-10 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight truncate hover:opacity-80 transition-opacity border-dashed ${c.bg} ${c.border} ${c.text}`}
                             style={{ top: baseTop + idx * blockHeight, height: blockHeight }}
-                            title={`${s.groupName} — ${formatTime12h(time)}${s.pendingCount > 0 ? ` (${s.pendingCount} queued)` : ""}`}
+                            title={`${s.groupName} — ${formatTime12h(time)} (scheduled, ${s.pendingCount} queued)`}
                           >
-                            {s.groupName}
+                            <span className="opacity-60">⏱</span> {s.groupName}
                           </Link>
                         );
                       });

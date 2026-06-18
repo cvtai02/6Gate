@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getDestinationIconPath } from "@/lib/destination-icons";
 import { DEST_TYPE_LABEL } from "@/lib/destination-types";
 
@@ -16,7 +15,7 @@ const STATUS_COLOR: Record<string, { border: string; bg: string; text: string; d
 
 const DEFAULT_COLOR = { border: "border-gray-500/40", bg: "bg-gray-500/5", text: "text-gray-400", dot: "bg-gray-400" };
 
-type BatchJob = {
+export type BatchJob = {
   id: string;
   platform: string;
   status: string;
@@ -35,33 +34,30 @@ type BatchJob = {
   providerType: string | null;
 };
 
-type NotificationChannel = {
+export type NotificationChannel = {
   id: string;
   chatId: string;
   chatName: string | null;
-  botName: string | null;
 };
 
-type Batch = {
+export type Batch = {
   batchId: string;
   title: string | null;
+  groupId: string | null;
+  groupName: string | null;
   videoPath: string;
   createdAt: string;
   jobs: BatchJob[];
-  notificationChannels?: NotificationChannel[];
+  notificationChannels: NotificationChannel[];
 };
 
 function DestinationNode({ job }: { job: BatchJob }) {
-  const router = useRouter();
   const color = STATUS_COLOR[job.status] ?? DEFAULT_COLOR;
   const icon = getDestinationIconPath(job.destinationType, job.providerType);
   const isScheduled = job.status === "Created" && job.scheduledAt;
 
   return (
-    <div
-      className={`rounded-xl border-2 ${color.border} ${color.bg} p-4 w-72 cursor-pointer hover:brightness-110 transition-all`}
-      onClick={() => router.push(`/jobs/${job.id}`)}
-    >
+    <div className={`rounded-xl border-2 ${color.border} ${color.bg} p-4 w-72`}>
       <div className="flex items-center gap-3 mb-3">
         {(job.destinationAvatar ?? job.accountAvatar) ? (
           <img
@@ -110,8 +106,16 @@ function DestinationNode({ job }: { job: BatchJob }) {
         )}
       </div>
 
+      {(() => {
+        const publishTime = job.publishedAt ?? (job.status === "Published" ? job.updatedAt : null);
+        const schedTime = isScheduled ? job.scheduledAt : null;
+        if (publishTime) return <div className="mt-2 text-[10px] text-gray-500">Published {new Date(publishTime).toLocaleString()}</div>;
+        if (schedTime) return <div className="mt-2 text-[10px] text-gray-500">Scheduled {new Date(schedTime).toLocaleString()}</div>;
+        return null;
+      })()}
+
       {job.errorMessage && (
-        <div className="mt-2 text-[10px] text-red-400/70 truncate" title={job.errorMessage}>
+        <div className="mt-1 text-[10px] text-red-400/70 truncate" title={job.errorMessage}>
           {job.errorMessage}
         </div>
       )}
@@ -150,9 +154,7 @@ function NotificationNode({ channels, allDone, anyFailed }: { channels: Notifica
       </div>
       <div className="mt-3 flex items-center gap-1.5">
         <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
-        <span className={`text-[11px] font-medium ${color.text}`}>
-          {status}
-        </span>
+        <span className={`text-[11px] font-medium ${color.text}`}>{status}</span>
       </div>
     </div>
   );

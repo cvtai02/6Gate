@@ -142,43 +142,38 @@ function GroupRow({ group }: { group: Group }) {
   return (
     <Link
       href={`/groups/${group.id}`}
-      className="rounded-xl border border-[var(--border)] bg-[var(--muted)] hover:border-gray-500 px-5 py-4 flex items-center gap-4 transition-colors block"
+      className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-white/[.04] transition-colors"
     >
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-semibold text-white truncate block">
-          {group.name}
-        </span>
-
-        {group.destinations.length === 0 ? (
-          <p className="text-xs text-gray-600 mt-1">No destinations</p>
-        ) : (
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            {group.destinations.slice(0, MAX_AVATARS).map((dest) => (
-              <DestAvatar
-                key={dest.destinationId}
-                type={dest.type ?? ""}
-                avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl}
-                providerType={dest.providerType}
-              />
-            ))}
-            {extra > 0 && (
-              <span className="text-xs text-gray-600">+{extra}</span>
-            )}
-          </div>
-        )}
-      </div>
+      <span className="text-sm font-medium text-white truncate min-w-0 flex-1">
+        {group.name}
+      </span>
+      {group.destinations.length === 0 ? (
+        <span className="text-[11px] text-gray-600 shrink-0">No destinations</span>
+      ) : (
+        <div className="flex items-center gap-1 shrink-0">
+          {group.destinations.slice(0, MAX_AVATARS).map((dest) => (
+            <DestAvatar
+              key={dest.destinationId}
+              type={dest.type ?? ""}
+              avatarUrl={dest.avatarUrl ?? dest.accountAvatarUrl}
+              providerType={dest.providerType}
+            />
+          ))}
+          {extra > 0 && (
+            <span className="text-[11px] text-gray-600 ml-0.5">+{extra}</span>
+          )}
+        </div>
+      )}
     </Link>
   );
 }
 
 function GroupRowSkeleton() {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-5 py-4 animate-pulse">
-      <div className="space-y-2">
-        <div className="h-4 w-36 bg-white/10 rounded" />
-        <div className="flex gap-1.5">
-          {[1, 2, 3].map((i) => <div key={i} className="w-6 h-6 rounded-md bg-white/10" />)}
-        </div>
+    <div className="flex items-center gap-3 px-4 py-2.5 animate-pulse">
+      <div className="h-4 w-36 bg-white/10 rounded" />
+      <div className="flex gap-1 ml-auto">
+        {[1, 2].map((i) => <div key={i} className="w-5 h-5 rounded-md bg-white/10" />)}
       </div>
     </div>
   );
@@ -208,13 +203,10 @@ export default function GroupsPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Groups</h1>
-          <p className="text-sm text-gray-500 mt-1">Broadcast to multiple platforms at once</p>
-        </div>
+        <h1 className="text-lg font-semibold text-white">Groups</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="text-sm bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
         >
           + New Group
         </button>
@@ -222,27 +214,21 @@ export default function GroupsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="space-y-3">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] py-1">
           {[1, 2, 3].map((i) => <GroupRowSkeleton key={i} />)}
         </div>
       ) : groups.length === 0 ? (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-16 text-center">
-          <div className="w-12 h-12 rounded-full bg-[var(--border)] flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </div>
-          <p className="text-white font-medium">No groups yet</p>
-          <p className="text-sm text-gray-500 mt-1">Create a group to post to multiple destinations at once.</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-12 text-center">
+          <p className="text-sm text-gray-500">No groups yet.</p>
           <button
             onClick={() => setShowCreate(true)}
-            className="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors"
           >
             + New Group
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] py-1 divide-y divide-[var(--border)]">
           {groups.map((group) => (
             <GroupRow key={group.id} group={group} />
           ))}

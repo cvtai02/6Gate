@@ -329,34 +329,28 @@ function JobProgressPanel({ jobs, onReset }: { jobs: JobResult[]; onReset: () =>
 
 /* ── Schedule Video Form ───────────────────────────────────────────────── */
 
-type InputMode = "url" | "storagePath";
-
 function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
   groupId: string;
   hasDestinations: boolean;
   onQueued: () => void;
   onUploaded: (jobs: JobResult[]) => void;
 }) {
-  const [inputMode, setInputMode] = useState<InputMode>("url");
   const [videoUrl, setVideoUrl] = useState("");
-  const [storagePath, setStoragePath] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [privacy, setPrivacy] = useState<"public" | "private" | "unlisted">("public");
   const [submitting, setSubmitting] = useState<"queue" | "upload" | null>(null);
   const [error, setError] = useState("");
 
-  const hasInput = inputMode === "url" ? videoUrl.trim() : storagePath.trim();
+  const hasInput = videoUrl.trim();
 
   function buildJsonBody(): string {
-    const body: Record<string, string | undefined> = {
+    return JSON.stringify({
+      videoUrl: videoUrl.trim(),
       title: title.trim() || undefined,
       caption: caption.trim() || undefined,
       privacy,
-    };
-    if (inputMode === "url") body.videoUrl = videoUrl.trim();
-    else body.absolutePath = storagePath.trim();
-    return JSON.stringify(body);
+    });
   }
 
   async function handleQueue(e: React.FormEvent) {
@@ -408,17 +402,11 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
 
   function reset() {
     setVideoUrl("");
-    setStoragePath("");
     setTitle("");
     setCaption("");
     setPrivacy("public");
     setError("");
   }
-
-  const modeLabels: { mode: InputMode; label: string }[] = [
-    { mode: "url", label: "CDN / Telegram URL" },
-    { mode: "storagePath", label: "Storage Path" },
-  ];
 
   return (
     <div className="space-y-5">
@@ -426,51 +414,17 @@ function ScheduleVideoForm({ groupId, hasDestinations, onQueued, onUploaded }: {
         <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
       )}
 
-      {/* Input mode tabs */}
-      <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
-        {modeLabels.map(({ mode, label }) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setInputMode(mode)}
-            className={`flex-1 py-2 text-xs font-medium transition-colors ${
-              inputMode === mode
-                ? "bg-indigo-500/20 text-indigo-300"
-                : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-            } ${mode !== "url" ? "border-l border-[var(--border)]" : ""}`}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Video URL input */}
+      <div>
+        <label className="block text-xs text-gray-400 mb-1.5">Video URL</label>
+        <input
+          value={videoUrl}
+          onChange={(e) => setVideoUrl(e.target.value)}
+          placeholder="https://cdn.example.com/videos/clip.mp4"
+          className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
+        />
+        <p className="text-[11px] text-gray-600 mt-1">Direct link to a video file hosted on a CDN or any public URL.</p>
       </div>
-
-      {/* CDN URL input */}
-      {inputMode === "url" && (
-        <div>
-          <label className="block text-xs text-gray-400 mb-1.5">Video URL</label>
-          <input
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="https://cdn.example.com/videos/clip.mp4"
-            className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
-          />
-          <p className="text-[11px] text-gray-600 mt-1">Direct link to a video file hosted on a CDN or any public URL.</p>
-        </div>
-      )}
-
-      {/* Storage path input */}
-      {inputMode === "storagePath" && (
-        <div>
-          <label className="block text-xs text-gray-400 mb-1.5">Storage Path</label>
-          <input
-            value={storagePath}
-            onChange={(e) => setStoragePath(e.target.value)}
-            placeholder="CloudflareR2/account/bucket/videos/clip.mp4"
-            className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
-          />
-          <p className="text-[11px] text-gray-600 mt-1">7router absolute path to the video file in cloud storage.</p>
-        </div>
-      )}
 
       {/* Metadata fields */}
       <div className="grid grid-cols-2 gap-3">

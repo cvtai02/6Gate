@@ -1,9 +1,21 @@
-import { JobStatusBadge } from "@/components/job-status-badge";
 import { createServerApiClient } from "@/lib/api-client";
 import type { AccountDto, JobDto, ProviderDto } from "@/lib/api-client";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_DOT: Record<string, string> = {
+  Created: "bg-yellow-400",
+  Initializing: "bg-blue-400 animate-pulse",
+  Uploading: "bg-blue-400 animate-pulse",
+  Finishing: "bg-indigo-400 animate-pulse",
+  Processing: "bg-indigo-400 animate-pulse",
+  Retrying: "bg-amber-400 animate-pulse",
+  Published: "bg-green-400",
+  Failed: "bg-red-400",
+  ReconnectRequired: "bg-orange-400",
+  Cancelled: "bg-gray-400",
+};
 
 async function getStats() {
   const api = createServerApiClient();
@@ -30,10 +42,10 @@ export default async function DashboardPage() {
   const cards = [
     { label: "Providers", value: stats.providers, href: "/providers", color: "text-purple-400" },
     { label: "Connections", value: stats.accounts, href: "/providers", color: "text-indigo-400" },
-    { label: "Queued", value: stats.pending, href: "/jobs", color: "text-yellow-400" },
-    { label: "Running", value: stats.running, href: "/jobs", color: "text-blue-400" },
-    { label: "Failed", value: stats.failed, href: "/jobs", color: "text-red-400" },
-    { label: "Completed", value: stats.completed, href: "/jobs", color: "text-green-400" },
+    { label: "Queued", value: stats.pending, href: "/groups", color: "text-yellow-400" },
+    { label: "Running", value: stats.running, href: "/groups", color: "text-blue-400" },
+    { label: "Failed", value: stats.failed, href: "/groups", color: "text-red-400" },
+    { label: "Completed", value: stats.completed, href: "/groups", color: "text-green-400" },
   ];
 
   return (
@@ -59,9 +71,6 @@ export default async function DashboardPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Recent Jobs</h2>
-          <Link href="/jobs" className="text-xs text-indigo-400 hover:text-indigo-300">
-            View all →
-          </Link>
         </div>
 
         {stats.recent.length === 0 ? (
@@ -73,7 +82,6 @@ export default async function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] text-gray-500 text-xs">
-                  <th className="px-5 py-3 text-left">Job ID</th>
                   <th className="px-5 py-3 text-left">Platform</th>
                   <th className="px-5 py-3 text-left">Title</th>
                   <th className="px-5 py-3 text-left">Status</th>
@@ -83,15 +91,13 @@ export default async function DashboardPage() {
               <tbody>
                 {stats.recent.map((job) => (
                   <tr key={job.id} className="border-b border-[var(--border)] last:border-0 hover:bg-white/[0.03]">
-                    <td className="px-5 py-3 font-mono text-xs text-gray-400">
-                      <Link href={`/jobs/${job.id}`} className="hover:text-white">
-                        {job.id}
-                      </Link>
-                    </td>
                     <td className="px-5 py-3 text-gray-300">{job.platform}</td>
                     <td className="px-5 py-3 text-gray-300 max-w-xs truncate">{job.title ?? "—"}</td>
                     <td className="px-5 py-3">
-                      <JobStatusBadge status={job.status} />
+                      <span className="inline-flex items-center gap-1.5 text-xs text-gray-300">
+                        <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[job.status] ?? "bg-gray-400"}`} />
+                        {job.status}
+                      </span>
                     </td>
                     <td className="px-5 py-3 text-gray-500 text-xs">
                       {new Date(job.createdAt ?? job.updatedAt).toLocaleString()}

@@ -7,13 +7,10 @@ import { DestinationsModule } from "./modules/destinations/destinations.module";
 import { GroupsModule } from "./modules/groups/groups.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { OauthModule } from "./modules/oauth/oauth.module";
-import { StorageModule } from "./modules/storage/storage.module";
-
 @Module({
   imports: [
     AuthModule,
     HealthModule,
-    StorageModule,
     ProvidersModule,
     AccountsModule,
     DestinationsModule,

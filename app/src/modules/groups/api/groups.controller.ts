@@ -27,6 +27,8 @@ import { AddGroupNotificationChannelUseCase } from "../usecases/commands/add-gro
 import { RemoveGroupNotificationChannelUseCase } from "../usecases/commands/remove-group-notification-channel.usecase";
 import { ListGroupNotificationChannelsUseCase } from "../usecases/queries/list-group-notification-channels.usecase";
 import { ListAllSchedulesUseCase } from "../usecases/queries/list-all-schedules.usecase";
+import { GetBatchDetailUseCase } from "../usecases/queries/get-batch-detail.usecase";
+import { ListAllHistoryUseCase } from "../usecases/queries/list-all-history.usecase";
 import { GetGroupHistoryUseCase } from "../usecases/queries/get-group-history.usecase";
 import { GetGroupUploadSettingsUseCase } from "../usecases/queries/get-group-upload-settings.usecase";
 import { GetNextUploadTimeUseCase } from "../usecases/queries/get-next-upload-time.usecase";
@@ -71,6 +73,8 @@ async function handleRequest<T>(
 export class GroupsController {
   constructor(
     private readonly listAllSchedules: ListAllSchedulesUseCase,
+    private readonly getBatchDetail: GetBatchDetailUseCase,
+    private readonly listAllHistory: ListAllHistoryUseCase,
     private readonly listGroups: ListGroupsUseCase,
     private readonly createGroup: CreateGroupUseCase,
     private readonly renameGroup: RenameGroupUseCase,
@@ -95,6 +99,18 @@ export class GroupsController {
   @Get("schedules")
   schedules() {
     return this.listAllSchedules.execute();
+  }
+
+  @Get("history")
+  allHistory(@Query("limit") limit: string | undefined, @Req() req: Request) {
+    return this.listAllHistory.execute(Number(limit ?? 250), requestBaseUrl(req));
+  }
+
+  @Get("history/:batchId")
+  async batchDetail(@Param("batchId") batchId: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.getBatchDetail.execute(batchId, requestBaseUrl(req));
+    if (!result) { res.status(404); return { error: "Batch not found" }; }
+    return result;
   }
 
   @Get(["groups", "combos"])

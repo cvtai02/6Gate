@@ -4,17 +4,14 @@ Owns publish groups, their destination membership, upload batch creation, groupe
 
 ## Upload APIs
 
-Two video input methods are supported:
-- **Video URL** (`videoUrl` JSON field) — Telegram video link, CDN URL, or any publicly accessible video URL
-- **7router storage path** (`absolutePath` JSON field)
+Video input is via URL (`videoUrl` JSON field) — Telegram video link, CDN URL, or any publicly accessible video URL.
 
 ### Immediate upload
-`POST /api/groups/:id/upload` — JSON body with `absolutePath` or `videoUrl`; downloads and immediately creates post jobs.
+`POST /api/groups/:id/upload` — JSON body with `videoUrl`; downloads and immediately creates post jobs.
 
-**JSON body (either field):**
+**JSON body:**
 ```json
 {
-  "absolutePath": "CloudflareR2/account/bucket/folder/video.mp4",
   "videoUrl": "https://cdn.example.com/video.mp4",
   "title": "optional title",
   "caption": "optional caption",
@@ -23,13 +20,11 @@ Two video input methods are supported:
 ```
 
 ### Queue an upload
-`POST /api/groups/:id/queue` — JSON body with `absolutePath` or `videoUrl`; enqueued for scheduled dispatch.
-
-Provide either `absolutePath` or `videoUrl`, not both. `absolutePath` must be a 7router absolute path in the format `Provider/account/bucket[/folder.../file]`.
+`POST /api/groups/:id/queue` — JSON body with `videoUrl`; enqueued for scheduled dispatch.
 
 ## Queue API
 
-- `GET  /api/groups/:id/queue` — list persisted queue items (returns `absolutePath` per item).
+- `GET  /api/groups/:id/queue` — list persisted queue items.
 - `DELETE /api/groups/:id/queue/:itemId` — remove an item.
 - `GET  /api/groups/:id/queue-settings` — return the daily upload time(s).
 - `PATCH /api/groups/:id/queue-settings` — update `uploadTimeInDay` in local `HH:mm` format.

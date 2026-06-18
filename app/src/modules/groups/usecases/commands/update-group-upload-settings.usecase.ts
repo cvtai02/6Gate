@@ -9,6 +9,9 @@ import {
   DEFAULT_UPLOAD_TIMES,
   ensureGroup,
   ensureUploadSettings,
+  localDateKey,
+  localTimeKey,
+  makeLastTriggeredSlot,
   parseUploadTimes,
   serializeUploadTimes,
 } from "../shared/group-helpers";
@@ -35,8 +38,9 @@ export class UpdateGroupUploadSettingsUseCase {
         .update(groupUploadSettings)
         .set({
           uploadTimeInDay: serialized,
-          // Reset trigger tracking when times change so the scheduler re-evaluates
-          lastTriggeredDate: existing.uploadTimeInDay === serialized ? existing.lastTriggeredDate : null,
+          lastTriggeredDate: existing.uploadTimeInDay === serialized
+            ? existing.lastTriggeredDate
+            : latestPastSlot(sorted),
           updatedAt: now,
         })
         .where(eq(groupUploadSettings.groupId, groupId));
@@ -52,4 +56,15 @@ export class UpdateGroupUploadSettingsUseCase {
 
     return ensureUploadSettings(groupId);
   }
+}
+
+function latestPastSlot(sortedSlots: string[]): string | null {
+  const today = localDateKey();
+  const now = localTimeKey();
+  let last: string | null = null;
+  for (const slot of sortedSlots) {
+    if (slot <= now) last = slot;
+    else break;
+  }
+  return last ? makeLastTriggeredSlot(today, last) : null;
 }

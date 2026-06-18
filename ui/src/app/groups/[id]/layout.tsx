@@ -48,7 +48,6 @@ export default function GroupDetailLayout({ children }: { children: React.ReactN
   const tabs = [
     { label: "Overview", href: base },
     { label: "Queue", href: `${base}/queue` },
-    { label: "History", href: `${base}/history` },
     { label: "Settings", href: `${base}/settings` },
   ];
 

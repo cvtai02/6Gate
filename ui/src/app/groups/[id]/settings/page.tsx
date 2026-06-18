@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 type QueueSettings = {
   uploadTimesInDay: string[];
@@ -14,6 +14,7 @@ type NextUploadTime = {
 
 export default function GroupSettingsPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [times, setTimes] = useState<string[]>(["09:00"]);
   const [nextUploadAt, setNextUploadAt] = useState<string | null>(null);
   const [originalTimes, setOriginalTimes] = useState<string[]>(["09:00"]);
@@ -21,6 +22,7 @@ export default function GroupSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,6 +184,41 @@ export default function GroupSettingsPage() {
             {saved && <span className="text-xs text-green-400">Saved</span>}
           </div>
         </form>
+      </div>
+      {/* Danger zone */}
+      <div className="rounded-xl border border-red-500/20 bg-[var(--muted)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-red-500/20">
+          <h2 className="text-sm font-semibold text-red-400">Danger Zone</h2>
+        </div>
+        <div className="p-5 flex items-center justify-between">
+          <div>
+            <p className="text-sm text-white">Delete this group</p>
+            <p className="text-xs text-gray-500 mt-0.5">This will remove the group, its destinations, queue, and schedule settings.</p>
+          </div>
+          <button
+            onClick={async () => {
+              if (!confirm("Are you sure you want to delete this group? This action cannot be undone.")) return;
+              setDeleting(true);
+              try {
+                const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+                if (res.ok || res.status === 204) {
+                  router.push("/groups");
+                } else {
+                  const data = await res.json().catch(() => ({}));
+                  alert((data as { error?: string }).error ?? "Failed to delete group");
+                }
+              } catch {
+                alert("Failed to delete group");
+              } finally {
+                setDeleting(false);
+              }
+            }}
+            disabled={deleting}
+            className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-500 text-white rounded-lg disabled:opacity-50 transition-colors shrink-0"
+          >
+            {deleting ? "Deleting…" : "Delete Group"}
+          </button>
+        </div>
       </div>
     </div>
   );

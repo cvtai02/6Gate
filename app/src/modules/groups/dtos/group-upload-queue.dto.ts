@@ -1,7 +1,7 @@
 export interface GroupUploadQueueItemDto {
   id: string;
   groupId: string;
-  absolutePath: string;
+  videoPath: string;
   title: string | null;
   caption: string | null;
   privacy: string | null;

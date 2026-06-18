@@ -17,7 +17,7 @@ export class ListGroupQueueUseCase {
     return rows.map((r) => ({
         id: r.id,
         groupId: r.groupId,
-        absolutePath: r.videoPath,
+        videoPath: r.videoPath,
         title: r.title,
         caption: r.caption,
         privacy: r.privacy,

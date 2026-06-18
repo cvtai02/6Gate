@@ -55,12 +55,11 @@ function AddToQueueForm({ groupId, onAdded }: { groupId: string; onAdded: () => 
     setSubmitting(true);
     setError("");
     try {
-      const isUrl = /^https?:\/\//i.test(storagePath.trim());
       const res = await fetch(`/api/groups/${groupId}/queue`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(isUrl ? { videoUrl: storagePath.trim() } : { absolutePath: storagePath.trim() }),
+          videoUrl: storagePath.trim(),
           title: title.trim() || undefined,
           caption: caption.trim() || undefined,
           privacy,
@@ -123,7 +122,7 @@ function AddToQueueForm({ groupId, onAdded }: { groupId: string; onAdded: () => 
             placeholder="https://cdn.example.com/video.mp4 or CloudflareR2/account/bucket/clip.mp4"
             className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors font-mono"
           />
-          <p className="text-[11px] text-gray-600 mt-1">CDN URL or 7router path. Dispatched at the next scheduled upload time.</p>
+          <p className="text-[11px] text-gray-600 mt-1">CDN URL or public video link. Dispatched at the next scheduled upload time.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

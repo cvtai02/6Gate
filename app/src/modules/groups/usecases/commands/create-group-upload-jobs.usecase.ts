@@ -8,7 +8,7 @@ import { startJobRunner } from "@/infrastructure/jobs/job-runner";
 import { getDestinationIconUrl } from "@/core/destination-icons";
 import { ProviderType } from "@/core/enums";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
-import { assertAbsolutePath, downloadFromStorage, downloadFromUrl, isUrl } from "../shared/storage-helper";
+import { downloadFromUrl } from "../shared/storage-helper";
 
 type UploadJobMetadata = {
   title?: string;
@@ -19,13 +19,8 @@ type UploadJobMetadata = {
 @Injectable()
 export class CreateGroupUploadJobsUseCase {
   async execute(groupId: string, input: CreateUploadJobsDto, baseUrl: string) {
-    let videoPath: string;
-    if (input.videoUrl) {
-      videoPath = await downloadFromUrl(input.videoUrl);
-    } else {
-      assertAbsolutePath(input.absolutePath);
-      videoPath = await downloadFromStorage(input.absolutePath!);
-    }
+    if (!input.videoUrl) throw new Error("videoUrl is required");
+    const videoPath = await downloadFromUrl(input.videoUrl);
     return this.createJobsForFile(groupId, videoPath, input, baseUrl);
   }
 

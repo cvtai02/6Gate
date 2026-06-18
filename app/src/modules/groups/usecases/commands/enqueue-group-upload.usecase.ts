@@ -6,7 +6,6 @@ import { groupUploadQueue, groupUploadSettings } from "@/infrastructure/db/schem
 import type { EnqueueGroupUploadDto } from "../../dtos/enqueue-group-upload.dto";
 import type { GroupUploadQueueItemDto } from "../../dtos/group-upload-queue.dto";
 import { ensureGroup, QUEUE_STATUS_PENDING } from "../shared/group-helpers";
-import { assertAbsolutePath, isUrl } from "../shared/storage-helper";
 import { DispatchNextQueuedGroupUploadUseCase } from "./dispatch-next-queued-group-upload.usecase";
 
 @Injectable()
@@ -16,9 +15,8 @@ export class EnqueueGroupUploadUseCase {
   async execute(groupId: string, input: EnqueueGroupUploadDto): Promise<GroupUploadQueueItemDto> {
     await ensureGroup(groupId);
 
-    const videoPath = input.videoUrl ?? input.absolutePath;
-    if (!input.videoUrl) assertAbsolutePath(input.absolutePath);
-    if (!videoPath) throw new Error("Either absolutePath or videoUrl is required");
+    const videoPath = input.videoUrl;
+    if (!videoPath) throw new Error("videoUrl is required");
 
     const now = new Date().toISOString();
     const id = `gqueue_${nanoid(10)}`;
@@ -49,7 +47,7 @@ export class EnqueueGroupUploadUseCase {
     return {
       id,
       groupId,
-      absolutePath: videoPath,
+      videoPath,
       title: input.title ?? null,
       caption: input.caption ?? null,
       privacy: input.privacy ?? null,

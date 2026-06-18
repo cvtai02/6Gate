@@ -20,6 +20,8 @@ import { GetNextUploadTimeUseCase } from "./usecases/queries/get-next-upload-tim
 import { ListGroupQueueUseCase } from "./usecases/queries/list-group-queue.usecase";
 import { GetGroupTelegramNotifyUseCase } from "./usecases/queries/get-group-telegram-notify.usecase";
 import { ListGroupNotificationChannelsUseCase } from "./usecases/queries/list-group-notification-channels.usecase";
+import { GetBatchDetailUseCase } from "./usecases/queries/get-batch-detail.usecase";
+import { ListAllHistoryUseCase } from "./usecases/queries/list-all-history.usecase";
 import { ListAllSchedulesUseCase } from "./usecases/queries/list-all-schedules.usecase";
 import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
 
@@ -45,6 +47,8 @@ import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
     GetGroupHistoryUseCase,
     GetGroupUploadSettingsUseCase,
     GetNextUploadTimeUseCase,
+    GetBatchDetailUseCase,
+    ListAllHistoryUseCase,
     ListAllSchedulesUseCase,
     ListGroupQueueUseCase,
     ListGroupsUseCase,
