@@ -1,4 +1,5 @@
-﻿import "reflect-metadata";
+﻿process.env.TZ = "Asia/Ho_Chi_Minh";
+import "reflect-metadata";
 import { randomBytes } from "crypto";
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";

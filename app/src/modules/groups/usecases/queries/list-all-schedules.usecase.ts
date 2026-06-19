@@ -42,6 +42,7 @@ export class ListAllSchedulesUseCase {
     }
 
     const today = localDateKey();
+    const nowTime = localTimeKey();
 
     return allGroups.map((group) => {
       const setting = settingsMap.get(group.id);
@@ -56,6 +57,7 @@ export class ListAllSchedulesUseCase {
         const sortedSlots = [...uploadTimesInDay].sort();
         let found: Date | null = null;
         for (const slot of sortedSlots) {
+          if (slot <= nowTime) continue;
           const alreadyTriggeredToday =
             lastSlot !== null && lastSlot.date === today && slot <= lastSlot.slot;
           if (alreadyTriggeredToday) continue;

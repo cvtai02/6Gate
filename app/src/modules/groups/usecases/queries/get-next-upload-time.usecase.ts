@@ -44,6 +44,8 @@ export class GetNextUploadTimeUseCase {
 
     // Check today's remaining slots
     for (const slot of sortedSlots) {
+      if (slot <= nowTime) continue;
+
       const alreadyTriggeredToday =
         lastSlot !== null &&
         lastSlot.date === today &&
