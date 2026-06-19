@@ -1,19 +1,32 @@
-import { Body, Controller, Param, Post, HttpCode } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, HttpCode } from "@nestjs/common";
 import { HandleTelegramWebhookUseCase } from "../usecases/handle-telegram-webhook.usecase";
+import { addWebhookLog, getWebhookLogs, clearWebhookLogs } from "../webhook-log";
 
 @Controller("webhooks/telegram")
 export class TelegramWebhookController {
   constructor(private readonly handleWebhook: HandleTelegramWebhookUseCase) {}
 
+  @Get("logs")
+  getLogs() {
+    return getWebhookLogs();
+  }
+
+  @Delete("logs")
+  @HttpCode(204)
+  deleteLogs() {
+    clearWebhookLogs();
+  }
+
   @Post(":accountId")
   @HttpCode(200)
   async receive(@Param("accountId") accountId: string, @Body() body: unknown) {
-    console.log("[Webhook] Received update for account", accountId, JSON.stringify(body).slice(0, 500));
+    let result = "ok";
     try {
       await this.handleWebhook.execute(accountId, body as any);
     } catch (err) {
-      console.error("[Webhook] Error:", err);
+      result = err instanceof Error ? err.message : String(err);
     }
+    addWebhookLog(accountId, body, result);
     return { ok: true };
   }
 }

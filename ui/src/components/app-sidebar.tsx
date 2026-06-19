@@ -9,6 +9,7 @@ const nav = [
   { href: "/groups", label: "Groups" },
   { href: "/schedule", label: "Schedule" },
   { href: "/usecases", label: "Use Cases" },
+  { href: "/webhook-logs", label: "Webhook Logs" },
 ];
 
 export function AppSidebar() {
