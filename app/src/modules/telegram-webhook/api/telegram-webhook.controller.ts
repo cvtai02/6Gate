@@ -8,7 +8,12 @@ export class TelegramWebhookController {
   @Post(":accountId")
   @HttpCode(200)
   async receive(@Param("accountId") accountId: string, @Body() body: unknown) {
-    await this.handleWebhook.execute(accountId, body as any).catch(() => undefined);
+    console.log("[Webhook] Received update for account", accountId, JSON.stringify(body).slice(0, 500));
+    try {
+      await this.handleWebhook.execute(accountId, body as any);
+    } catch (err) {
+      console.error("[Webhook] Error:", err);
+    }
     return { ok: true };
   }
 }

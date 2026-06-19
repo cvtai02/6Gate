@@ -10,7 +10,7 @@ import { QUEUE_STATUS_PENDING } from "@/modules/groups/usecases/shared/group-hel
 
 type TelegramMessage = {
   message_id: number;
-  chat: { id: number; title?: string };
+  chat: { id: number; title?: string; username?: string };
   from?: { first_name?: string; username?: string; is_bot?: boolean };
   text?: string;
   caption?: string;
@@ -61,12 +61,15 @@ export class HandleTelegramWebhookUseCase {
       return;
     }
 
-    const chatId = String(message.chat.id);
-    const channels = await db
+    const numericChatId = String(message.chat.id);
+    const allChannels = await db
       .select()
       .from(groupNotificationChannels)
-      .where(and(eq(groupNotificationChannels.chatId, chatId), eq(groupNotificationChannels.accountId, accountId)));
+      .where(eq(groupNotificationChannels.accountId, accountId));
 
+    const channels = allChannels.filter(
+      (ch) => ch.chatId === numericChatId || (message.chat.username && ch.chatId === `@${message.chat.username}`),
+    );
     if (channels.length === 0) return;
 
     const localPath = await downloadTelegramFile(botToken, video!.file_id);
