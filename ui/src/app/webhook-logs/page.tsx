@@ -10,10 +10,23 @@ type LogEntry = {
   result: string;
 };
 
+type WebhookStatus = {
+  accountId: string;
+  botName?: string;
+  webhookUrl?: string | null;
+  pendingUpdateCount?: number;
+  lastErrorDate?: string | null;
+  lastErrorMessage?: string | null;
+  allowedUpdates?: string[] | null;
+  error?: string;
+};
+
 export default function WebhookLogsPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [statuses, setStatuses] = useState<WebhookStatus[]>([]);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState(false);
 
   async function fetchLogs() {
     try {
@@ -22,8 +35,18 @@ export default function WebhookLogsPage() {
     } catch {}
   }
 
+  async function fetchStatus() {
+    setLoadingStatus(true);
+    try {
+      const res = await fetch("/api/webhooks/telegram/status");
+      if (res.ok) setStatuses(await res.json());
+    } catch {}
+    setLoadingStatus(false);
+  }
+
   useEffect(() => {
     fetchLogs();
+    fetchStatus();
     if (!autoRefresh) return;
     const id = setInterval(fetchLogs, 3000);
     return () => clearInterval(id);
@@ -89,6 +112,77 @@ export default function WebhookLogsPage() {
         </div>
       </div>
 
+      {/* Webhook Status */}
+      <div className="mb-6 border border-[var(--border)] rounded-lg bg-[var(--muted)] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-white">Webhook Status</h2>
+          <button
+            onClick={fetchStatus}
+            disabled={loadingStatus}
+            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 text-gray-400 rounded transition-colors disabled:opacity-50"
+          >
+            {loadingStatus ? "Checking..." : "Re-check"}
+          </button>
+        </div>
+        {statuses.length === 0 ? (
+          <p className="text-sm text-gray-500">No Telegram bot accounts found</p>
+        ) : (
+          <div className="space-y-3">
+            {statuses.map((s) => (
+              <div key={s.accountId} className="bg-black/20 rounded p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      s.error ? "bg-red-400" : s.webhookUrl ? "bg-green-400" : "bg-yellow-400"
+                    }`}
+                  />
+                  <span className="text-sm font-medium text-white">{s.botName || s.accountId}</span>
+                  <span className="text-xs text-gray-600 font-mono">{s.accountId}</span>
+                </div>
+                {s.error ? (
+                  <p className="text-xs text-red-400">{s.error}</p>
+                ) : (
+                  <div className="space-y-1 text-xs">
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 w-24 shrink-0">URL:</span>
+                      <span className={s.webhookUrl ? "text-green-400" : "text-yellow-400"}>
+                        {s.webhookUrl || "Not set"}
+                      </span>
+                    </div>
+                    {s.pendingUpdateCount !== undefined && s.pendingUpdateCount > 0 && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-500 w-24 shrink-0">Pending:</span>
+                        <span className="text-yellow-400">{s.pendingUpdateCount} updates</span>
+                      </div>
+                    )}
+                    {s.lastErrorMessage && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-500 w-24 shrink-0">Last error:</span>
+                        <span className="text-red-400">
+                          {s.lastErrorMessage}
+                          {s.lastErrorDate && (
+                            <span className="text-gray-600 ml-2">
+                              ({new Date(s.lastErrorDate).toLocaleString()})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {s.allowedUpdates && (
+                      <div className="flex gap-2">
+                        <span className="text-gray-500 w-24 shrink-0">Updates:</span>
+                        <span className="text-gray-400">{s.allowedUpdates.join(", ") || "all"}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Logs */}
       {logs.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <p className="text-lg">No webhook messages yet</p>
