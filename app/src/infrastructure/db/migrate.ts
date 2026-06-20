@@ -233,33 +233,8 @@ export async function runMigrations() {
   await run(`UPDATE post_jobs SET status = 'Published' WHERE status = 'completed'`);
   await run(`UPDATE post_jobs SET status = 'Failed'    WHERE status = 'failed'`);
 
-  await run(`
-    CREATE TABLE IF NOT EXISTS router7 (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      base_url TEXT,
-      access_token TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `);
-
-  // Migrate data from old 'storage' table if it exists.
-  await tryRun(`INSERT INTO router7 SELECT id, name, base_url, access_token, created_at, updated_at FROM storage ON CONFLICT (id) DO NOTHING`);
+  await tryRun(`DROP TABLE IF EXISTS router7`);
   await tryRun(`DROP TABLE IF EXISTS storage`);
-
-  // Seed "7router" if it doesn't exist, migrating any access token from the settings table.
-  await run(`
-    INSERT INTO router7 (id, name, access_token, created_at, updated_at)
-    VALUES (
-      '7router',
-      '7router',
-      (SELECT value FROM settings WHERE key = 'storageAccessToken'),
-      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-      to_char(now(), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-    )
-    ON CONFLICT (id) DO NOTHING
-  `);
 
   // Notification channels — replaces per-group telegram columns with a many-to-many table
   await run(`

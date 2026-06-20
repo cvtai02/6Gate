@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { getDb } from "@/infrastructure/db";
 import { jobLogs } from "@/infrastructure/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export type LogLevel = "info" | "warn" | "error";
 

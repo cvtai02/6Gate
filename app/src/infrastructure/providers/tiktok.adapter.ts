@@ -319,9 +319,12 @@ export class TikTokAdapter implements SocialProviderAdapter {
     // moderation hasn't surfaced a public URL yet — fall back to the publish_id as our
     // provider handle and skip the URL. The upload itself succeeded.
     if (sentToInbox || !postId) {
+      const profileUrl = account.username
+        ? `https://www.tiktok.com/@${account.username}`
+        : undefined;
       return {
         providerPostId: postId ?? publish_id,
-        url: undefined,
+        url: profileUrl,
       };
     }
 

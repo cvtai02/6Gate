@@ -33,7 +33,6 @@ const TABLES: { name: string; pk: string; source?: string }[] = [
   { name: "combo_destinations", pk: "id" },
   { name: "group_upload_queue", pk: "id" },
   { name: "group_upload_settings", pk: "group_id" },
-  { name: "router7", pk: "id" },
 ];
 
 async function main() {

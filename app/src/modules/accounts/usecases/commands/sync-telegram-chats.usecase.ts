@@ -18,15 +18,21 @@ export class SyncTelegramChatsUseCase {
     const db = getDb();
     const account = await getTelegramAccountOrThrow(accountId);
 
-    const updates = await telegramRequest<TelegramUpdate[]>(account.accessToken!, "getUpdates", {
-      limit: 100,
-      allowed_updates: ["message", "channel_post", "edited_message", "edited_channel_post", "my_chat_member", "chat_member", "callback_query"],
-    });
-    const discoveredChats = extractTelegramChats(updates);
     const candidateChats = new Map<string, Awaited<ReturnType<typeof refreshTelegramChat>>>();
-    for (const chat of discoveredChats) {
-      const refreshed = await refreshTelegramChat(account.accessToken!, chat);
-      candidateChats.set(String(refreshed.id), refreshed);
+
+    // Try getUpdates — this fails when a webhook is active, which is normal
+    try {
+      const updates = await telegramRequest<TelegramUpdate[]>(account.accessToken!, "getUpdates", {
+        limit: 100,
+        allowed_updates: ["message", "channel_post", "edited_message", "edited_channel_post", "my_chat_member", "chat_member", "callback_query"],
+      });
+      const discoveredChats = extractTelegramChats(updates);
+      for (const chat of discoveredChats) {
+        const refreshed = await refreshTelegramChat(account.accessToken!, chat);
+        candidateChats.set(String(refreshed.id), refreshed);
+      }
+    } catch {
+      // Webhook is active — getUpdates is unavailable, proceed with existing destinations only
     }
 
     const existingDestinations = await db

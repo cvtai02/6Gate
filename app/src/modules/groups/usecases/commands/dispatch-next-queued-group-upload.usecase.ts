@@ -10,6 +10,7 @@ import {
   QUEUE_STATUS_FAILED,
   QUEUE_STATUS_PENDING,
 } from "../shared/group-helpers";
+import { downloadRouter7File, isRouter7Path } from "@/infrastructure/providers/router7";
 
 @Injectable()
 export class DispatchNextQueuedGroupUploadUseCase {
@@ -46,6 +47,9 @@ export class DispatchNextQueuedGroupUploadUseCase {
       let result;
       if (existsSync(next.videoPath)) {
         result = await this.createUploadJobs.executeFromLocalFile(groupId, next.videoPath, metadata, LOCAL_SCHEDULER_BASE_URL);
+      } else if (isRouter7Path(next.videoPath)) {
+        const localFile = await downloadRouter7File(next.videoPath);
+        result = await this.createUploadJobs.executeFromLocalFile(groupId, localFile, metadata, LOCAL_SCHEDULER_BASE_URL);
       } else {
         result = await this.createUploadJobs.execute(groupId, { videoUrl: next.videoPath, ...metadata }, LOCAL_SCHEDULER_BASE_URL);
       }

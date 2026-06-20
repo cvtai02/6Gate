@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { eq, and } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
-import { accounts, groupNotificationChannels, groupUploadQueue } from "@/infrastructure/db/schema";
+import { accounts, groupNotificationChannels, groupUploadQueue, groupUploadSettings, groups } from "@/infrastructure/db/schema";
 import { downloadTelegramFile, telegramRequest } from "@/modules/accounts/usecases/shared/telegram-helpers";
 import { decryptValue } from "@/core/security/crypto";
 import { env } from "@/infrastructure/config/env";
 import { EnqueueGroupUploadUseCase } from "@/modules/groups/usecases/commands/enqueue-group-upload.usecase";
-import { QUEUE_STATUS_PENDING } from "@/modules/groups/usecases/shared/group-helpers";
+import { QUEUE_STATUS_PENDING, parseUploadTimes } from "@/modules/groups/usecases/shared/group-helpers";
 
 type TelegramMessage = {
   message_id: number;
@@ -44,11 +44,12 @@ export class HandleTelegramWebhookUseCase {
     const botToken = decryptValue(account.accessToken, env.encryptionKey);
 
     const video = message.video ?? this.extractVideoDocument(message.document);
+    const sevenRouterPath = text.match(/@7router:\s*(.+)/i)?.[1]?.trim() || undefined;
     const title = text.match(/@title:\s*(.+)/i)?.[1]?.trim() || undefined;
     const caption = text.match(/@caption:\s*(.+)/i)?.[1]?.trim() || undefined;
 
     const missing: string[] = [];
-    if (!video) missing.push("video");
+    if (!video && !sevenRouterPath) missing.push("video or @7router:");
     if (!title) missing.push("@title:");
     if (!caption) missing.push("@caption:");
 
@@ -56,7 +57,7 @@ export class HandleTelegramWebhookUseCase {
       await this.reply(
         botToken,
         message.chat.id,
-        `⚠️ /queue requires: ${missing.join(", ")}\n\nFormat:\n/queue\n@title: video title\n@caption: description #tags`,
+        `⚠️ /queue requires: ${missing.join(", ")}\n\nFormat:\n/queue\n@title: video title\n@caption: description #tags\n@7router: path/to/video.mp4 (or attach video)`,
       );
       return;
     }
@@ -72,11 +73,13 @@ export class HandleTelegramWebhookUseCase {
     );
     if (channels.length === 0) return;
 
-    const localPath = await downloadTelegramFile(botToken, video!.file_id);
+    const videoPath = video
+      ? await downloadTelegramFile(botToken, video.file_id)
+      : sevenRouterPath!;
 
     for (const channel of channels) {
       await this.enqueue.execute(channel.groupId, {
-        videoUrl: localPath,
+        videoUrl: videoPath,
         title: title!,
         caption: caption!,
         sourceChatId: String(message.chat.id),
@@ -89,11 +92,18 @@ export class HandleTelegramWebhookUseCase {
         .where(and(eq(groupUploadQueue.groupId, channel.groupId), eq(groupUploadQueue.status, QUEUE_STATUS_PENDING)))
         .then((r) => r.length);
 
-      await this.reply(
-        botToken,
-        message.chat.id,
-        `📥 <b>${escapeHtml(title!)}</b> queued (#${pendingCount} in queue)`,
-      );
+      const group = await db.select().from(groups).where(eq(groups.id, channel.groupId)).then((r) => r[0]);
+      const settings = await db.select().from(groupUploadSettings).where(eq(groupUploadSettings.groupId, channel.groupId)).then((r) => r[0]);
+      const uploadTimes = settings ? parseUploadTimes(settings.uploadTimeInDay).sort() : [];
+
+      const lines: string[] = [];
+      lines.push(`📥 <b>${escapeHtml(title!)}</b>`);
+      if (group) lines.push(`📂 ${escapeHtml(group.name)}`);
+      lines.push(`📋 #${pendingCount} in queue`);
+      if (uploadTimes.length > 0) lines.push(`⏰ ${uploadTimes.join(", ")}`);
+      if (caption) lines.push(`\n💬 ${escapeHtml(caption!.length > 100 ? caption!.slice(0, 100) + "…" : caption!)}`);
+
+      await this.reply(botToken, message.chat.id, lines.join("\n"));
     }
   }
 

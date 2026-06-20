@@ -138,7 +138,7 @@ function AddBotModal({
   onClose: () => void;
   onAdded: () => void;
 }) {
-  const [form, setForm] = useState({ name: "Telegram Bot", botToken: "", chatId: "", chatName: "" });
+  const [botToken, setBotToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -150,13 +150,7 @@ function AddBotModal({
       const res = await fetch("/api/accounts/telegram/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerId: provider.id,
-          name: form.name,
-          botToken: form.botToken,
-          chatId: form.chatId || undefined,
-          chatName: form.chatName || undefined,
-        }),
+        body: JSON.stringify({ providerId: provider.id, botToken }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -175,7 +169,7 @@ function AddBotModal({
       className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-lg">
+      <div className="bg-[var(--muted)] border border-[var(--border)] rounded-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-sm font-semibold text-white">Add Telegram Bot</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">✕</button>
@@ -185,43 +179,16 @@ function AddBotModal({
             <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
           )}
           <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Bot Name</label>
-            <input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-            />
-          </div>
-          <div>
             <label className="block text-xs text-gray-400 mb-1.5">Bot Token</label>
             <input
               required
               type="password"
-              value={form.botToken}
-              onChange={(e) => setForm((f) => ({ ...f, botToken: e.target.value }))}
+              value={botToken}
+              onChange={(e) => setBotToken(e.target.value)}
               className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
               placeholder="123456:ABC..."
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Chat ID <span className="text-gray-600">(optional)</span></label>
-              <input
-                value={form.chatId}
-                onChange={(e) => setForm((f) => ({ ...f, chatId: e.target.value }))}
-                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder="@channel or -100..."
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-400 mb-1.5">Chat Name <span className="text-gray-600">(optional)</span></label>
-              <input
-                value={form.chatName}
-                onChange={(e) => setForm((f) => ({ ...f, chatName: e.target.value }))}
-                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
-                placeholder="optional"
-              />
-            </div>
+            <p className="text-xs text-gray-600 mt-1.5">Bot name and username will be synced automatically from Telegram.</p>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors">

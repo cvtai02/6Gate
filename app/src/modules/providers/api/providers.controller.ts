@@ -6,6 +6,7 @@ import { GetProviderUseCase } from "../usecases/queries/get-provider.usecase";
 import { ListProvidersUseCase } from "../usecases/queries/list-providers.usecase";
 import type { CreateProviderDto } from "../dtos/create-provider.dto";
 import type { UpdateProviderDto } from "../dtos/update-provider.dto";
+import { getRouter7Config, setRouter7Config } from "@/infrastructure/providers/router7";
 
 @Controller("providers")
 export class ProvidersController {
@@ -25,6 +26,21 @@ export class ProvidersController {
   @Post()
   create(@Body() body: CreateProviderDto) {
     return this.createProvider.execute(body);
+  }
+
+  @Get("integrations/router7")
+  getRouter7() {
+    return getRouter7Config().then((c) => ({
+      baseUrl: c.baseUrl,
+      configured: !!c.accessToken,
+    }));
+  }
+
+  @Patch("integrations/router7")
+  async updateRouter7(@Body() body: { baseUrl?: string; accessToken?: string }) {
+    await setRouter7Config(body);
+    const config = await getRouter7Config();
+    return { baseUrl: config.baseUrl, configured: !!config.accessToken };
   }
 
   @Get(":id")

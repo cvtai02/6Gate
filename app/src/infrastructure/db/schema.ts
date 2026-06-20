@@ -158,14 +158,7 @@ export const groupUploadQueue = pgTable("group_upload_queue", {
   updatedAt: text("updated_at").notNull(),
 });
 
-export const router7 = pgTable("router7", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  baseUrl: text("base_url"),
-  accessToken: text("access_token"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+
 
 export const groupUploadSettings = pgTable("group_upload_settings", {
   groupId: text("group_id").primaryKey(),

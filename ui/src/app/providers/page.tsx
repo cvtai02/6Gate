@@ -168,7 +168,7 @@ type NotificationAdapterMeta = {
 const NOTIFICATION_ADAPTERS: NotificationAdapterMeta[] = [
   {
     label: "Telegram",
-    description: "Send upload notifications to Telegram chats",
+    description: "Schedule uploads and receive notifications via Telegram",
     href: "/providers/telegram",
     Icon: TelegramIcon,
     iconBg: "bg-sky-500",
@@ -509,6 +509,130 @@ function ProviderRow({
   );
 }
 
+/* ── 7router config section ───────────────────────────────────────────── */
+
+function Router7Section() {
+  const [config, setConfig] = useState<{ baseUrl: string; configured: boolean } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [token, setToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadConfig() {
+    const res = await fetch("/api/providers/integrations/router7");
+    if (res.ok) {
+      const data = await res.json();
+      setConfig(data);
+      setBaseUrl(data.baseUrl);
+    }
+  }
+
+  useEffect(() => { loadConfig(); }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    const body: Record<string, string> = {};
+    if (baseUrl !== config?.baseUrl) body.baseUrl = baseUrl;
+    if (token) body.accessToken = token;
+    try {
+      const res = await fetch("/api/providers/integrations/router7", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error ?? "Failed to save");
+      } else {
+        setToken("");
+        setEditing(false);
+        await loadConfig();
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!config) return null;
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+        7router
+      </h2>
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-5 py-4">
+        {!editing ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <span className="text-lg font-bold text-emerald-400">7</span>
+              </div>
+              <div>
+                <p className="text-sm text-white font-medium">7router</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {config.configured ? (
+                    <span className="inline-flex items-center gap-1 text-green-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+                      Connected
+                    </span>
+                  ) : (
+                    <span className="text-yellow-400">Not configured</span>
+                  )}
+                  <span className="text-gray-600 ml-2">{config.baseUrl}</span>
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs border border-[var(--border)] hover:border-indigo-500/50 text-gray-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {config.configured ? "Edit" : "Configure"}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-3">
+            {error && (
+              <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
+            )}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">Base URL</label>
+              <input
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">
+                Access Token
+                {config.configured && <span className="text-gray-600 ml-1">(leave blank to keep current)</span>}
+              </label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder={config.configured ? "••••••••" : "Enter access token"}
+                className="w-full bg-black/30 border border-[var(--border)] focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none transition-colors"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => { setEditing(false); setError(""); setToken(""); setBaseUrl(config.baseUrl); }} className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[var(--border)] rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button type="submit" disabled={saving} className="px-5 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 transition-colors">
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Page ─────────────────────────────────────────────────────────────── */
 
 export default function ProvidersPage() {
@@ -558,10 +682,10 @@ export default function ProvidersPage() {
         </div>
       </div>
 
-      {/* Notification section */}
+      {/* Telegram section */}
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-          Notification
+          Telegram
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {NOTIFICATION_ADAPTERS.map((meta) => (
@@ -574,6 +698,9 @@ export default function ProvidersPage() {
           ))}
         </div>
       </div>
+
+      {/* 7router section */}
+      <Router7Section />
 
     </div>
   );
