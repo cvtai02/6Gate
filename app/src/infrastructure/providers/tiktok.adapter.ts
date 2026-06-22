@@ -1,5 +1,4 @@
 import { nanoid } from "nanoid";
-import { randomBytes, createHash } from "crypto";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
 import { accounts, providers as providersTable } from "@/infrastructure/db/schema";

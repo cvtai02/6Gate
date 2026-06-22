@@ -1,16 +1,16 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
 import { settings } from "@/infrastructure/db/schema";
-import { decryptValue } from "@/core/security/crypto";
+import { decryptValue, encryptValue } from "@/core/security/crypto";
 import { env } from "@/infrastructure/config/env";
 import { downloadFromUrl } from "@/modules/groups/usecases/shared/storage-helper";
 
-const SETTINGS_KEY_BASE_URL = "router7BaseUrl";
-const SETTINGS_KEY_TOKEN = "router7AccessToken";
+const SETTINGS_KEY_BASE_URL = "sevenRouterBaseUrl";
+const SETTINGS_KEY_TOKEN = "sevenRouterAccessToken";
 
 const DEFAULT_BASE_URL = "https://7router-api.minfect.com";
 
-export async function getRouter7Config(): Promise<{ baseUrl: string; accessToken: string | null }> {
+export async function getSevenRouterConfig(): Promise<{ baseUrl: string; accessToken: string | null }> {
   const db = getDb();
   const rows = await db
     .select()
@@ -29,7 +29,7 @@ export async function getRouter7Config(): Promise<{ baseUrl: string; accessToken
   };
 }
 
-export async function setRouter7Config(input: { baseUrl?: string; accessToken?: string }) {
+export async function setSevenRouterConfig(input: { baseUrl?: string; accessToken?: string }) {
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -41,7 +41,6 @@ export async function setRouter7Config(input: { baseUrl?: string; accessToken?: 
   }
 
   if (input.accessToken !== undefined) {
-    const { encryptValue } = await import("@/core/security/crypto");
     const encrypted = encryptValue(input.accessToken, env.encryptionKey);
     await db
       .insert(settings)
@@ -50,12 +49,12 @@ export async function setRouter7Config(input: { baseUrl?: string; accessToken?: 
   }
 }
 
-export function isRouter7Path(value: string): boolean {
+export function isSevenRouterPath(value: string): boolean {
   return !value.startsWith("http") && !value.startsWith("/") && value.includes("/");
 }
 
-async function resolveRouter7Path(absolutePath: string): Promise<string> {
-  const config = await getRouter7Config();
+async function resolveSevenRouterPath(absolutePath: string): Promise<string> {
+  const config = await getSevenRouterConfig();
   if (!config.accessToken) throw new Error("7router access token is not configured");
 
   const res = await fetch(`${config.baseUrl}/files/temp-download-url`, {
@@ -76,7 +75,7 @@ async function resolveRouter7Path(absolutePath: string): Promise<string> {
   return data.url;
 }
 
-export async function downloadRouter7File(absolutePath: string): Promise<string> {
-  const url = await resolveRouter7Path(absolutePath);
+export async function downloadSevenRouterFile(absolutePath: string): Promise<string> {
+  const url = await resolveSevenRouterPath(absolutePath);
   return downloadFromUrl(url);
 }

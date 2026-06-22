@@ -511,7 +511,7 @@ function ProviderRow({
 
 /* ── 7router config section ───────────────────────────────────────────── */
 
-function Router7Section() {
+function SevenRouterSection() {
   const [config, setConfig] = useState<{ baseUrl: string; configured: boolean } | null>(null);
   const [editing, setEditing] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
@@ -520,7 +520,7 @@ function Router7Section() {
   const [error, setError] = useState("");
 
   async function loadConfig() {
-    const res = await fetch("/api/providers/integrations/router7");
+    const res = await fetch("/api/providers/integrations/seven-router");
     if (res.ok) {
       const data = await res.json();
       setConfig(data);
@@ -538,7 +538,7 @@ function Router7Section() {
     if (baseUrl !== config?.baseUrl) body.baseUrl = baseUrl;
     if (token) body.accessToken = token;
     try {
-      const res = await fetch("/api/providers/integrations/router7", {
+      const res = await fetch("/api/providers/integrations/seven-router", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -700,7 +700,7 @@ export default function ProvidersPage() {
       </div>
 
       {/* 7router section */}
-      <Router7Section />
+      <SevenRouterSection />
 
     </div>
   );

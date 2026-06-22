@@ -16,7 +16,3 @@ export function getAdapter(type: string): SocialProviderAdapter {
   if (!adapter) throw new Error(`No adapter for provider type: ${type}`);
   return adapter;
 }
-
-export function listAdapterTypes(): string[] {
-  return Array.from(adapters.keys());
-}

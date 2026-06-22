@@ -3,10 +3,6 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { nanoid } from "nanoid";
 
-export function isUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value);
-}
-
 export async function downloadFromUrl(videoUrl: string): Promise<string> {
   const res = await fetch(videoUrl);
   if (!res.ok) throw new Error(`Failed to download video from URL (HTTP ${res.status})`);
