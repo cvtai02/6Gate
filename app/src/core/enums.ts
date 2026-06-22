@@ -74,6 +74,15 @@ export const ErrorKind = {
 } as const;
 export type ErrorKind = (typeof ErrorKind)[keyof typeof ErrorKind];
 
+export const DestinationMeta: Record<DestinationType, { displayName: string }> = {
+  [DestinationType.facebook_page]: { displayName: "Facebook" },
+  [DestinationType.youtube_channel]: { displayName: "YouTube" },
+  [DestinationType.tiktok_account]: { displayName: "TikTok" },
+  [DestinationType.instagram_account]: { displayName: "Instagram" },
+  [DestinationType.threads_profile]: { displayName: "Threads" },
+  [DestinationType.TelegramChat]: { displayName: "Telegram" },
+};
+
 export const Providers = {
   [ProviderType.meta]: {
     id: ProviderType.meta,

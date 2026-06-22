@@ -184,6 +184,7 @@ export default function GroupQueuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [retrying, setRetrying] = useState<Set<string>>(new Set());
 
   async function load() {
     try {
@@ -218,6 +219,22 @@ export default function GroupQueuePage() {
       setItems((prev) => prev.filter((x) => x.id !== itemId));
     } finally {
       setDeleting((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  }
+
+  async function handleRetry(itemId: string) {
+    setRetrying((prev) => new Set(prev).add(itemId));
+    try {
+      const res = await fetch(`/api/groups/${id}/queue/${itemId}/retry`, { method: "POST" });
+      if (res.ok) {
+        await load();
+      }
+    } finally {
+      setRetrying((prev) => {
         const next = new Set(prev);
         next.delete(itemId);
         return next;
@@ -282,16 +299,28 @@ export default function GroupQueuePage() {
             <p className="text-xs text-gray-700">Added {new Date(item.createdAt).toLocaleString()}</p>
           </div>
 
-          {item.status === "Pending" && (
-            <button
-              type="button"
-              disabled={deleting.has(item.id)}
-              onClick={() => handleDelete(item.id)}
-              className="shrink-0 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-gray-400 hover:border-red-500/50 hover:text-red-400 transition-colors disabled:opacity-40"
-            >
-              {deleting.has(item.id) ? "Removing…" : "Remove"}
-            </button>
-          )}
+          <div className="shrink-0 flex flex-col gap-1.5">
+            {item.status === "Failed" && (
+              <button
+                type="button"
+                disabled={retrying.has(item.id)}
+                onClick={() => handleRetry(item.id)}
+                className="rounded-lg border border-indigo-500/30 px-3 py-1.5 text-xs text-indigo-400 hover:border-indigo-500/60 hover:text-indigo-300 transition-colors disabled:opacity-40"
+              >
+                {retrying.has(item.id) ? "Retrying…" : "Retry"}
+              </button>
+            )}
+            {(item.status === "Pending" || item.status === "Failed") && (
+              <button
+                type="button"
+                disabled={deleting.has(item.id)}
+                onClick={() => handleDelete(item.id)}
+                className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs text-gray-400 hover:border-red-500/50 hover:text-red-400 transition-colors disabled:opacity-40"
+              >
+                {deleting.has(item.id) ? "Removing…" : "Remove"}
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>

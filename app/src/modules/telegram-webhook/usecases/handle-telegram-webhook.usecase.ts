@@ -6,7 +6,7 @@ import { downloadTelegramFile, telegramRequest } from "@/modules/accounts/usecas
 import { decryptValue } from "@/core/security/crypto";
 import { env } from "@/infrastructure/config/env";
 import { EnqueueGroupUploadUseCase } from "@/modules/groups/usecases/commands/enqueue-group-upload.usecase";
-import { QUEUE_STATUS_PENDING, parseUploadTimes } from "@/modules/groups/usecases/shared/group-helpers";
+import { QUEUE_STATUS_PENDING, localDateKey, localTimeKey, parseLastTriggeredSlot, parseUploadTimes } from "@/modules/groups/usecases/shared/group-helpers";
 
 type TelegramMessage = {
   message_id: number;
@@ -25,6 +25,43 @@ type TelegramWebhookUpdate = {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function estimatePublishTime(position: number, uploadTimes: string[], lastTriggeredDate: string | null): Date | null {
+  if (uploadTimes.length === 0 || position <= 0) return null;
+  const sorted = [...uploadTimes].sort();
+  const today = localDateKey();
+  const now = localTimeKey();
+  const lastSlot = parseLastTriggeredSlot(lastTriggeredDate);
+
+  let remaining = position;
+  let dayOffset = 0;
+
+  while (remaining > 0) {
+    for (const slot of sorted) {
+      const isToday = dayOffset === 0;
+      if (isToday && slot <= now) continue;
+      if (isToday && lastSlot?.date === today && slot <= lastSlot.slot) continue;
+      remaining--;
+      if (remaining === 0) {
+        const [h, m] = slot.split(":").map(Number);
+        const d = new Date();
+        d.setDate(d.getDate() + dayOffset);
+        d.setHours(h, m, 0, 0);
+        return d;
+      }
+    }
+    dayOffset++;
+  }
+  return null;
+}
+
+function formatDateTime(d: Date): string {
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  return `${hh}:${mm} ${dd}/${mo}`;
 }
 
 @Injectable()
@@ -96,12 +133,12 @@ export class HandleTelegramWebhookUseCase {
       const settings = await db.select().from(groupUploadSettings).where(eq(groupUploadSettings.groupId, channel.groupId)).then((r) => r[0]);
       const uploadTimes = settings ? parseUploadTimes(settings.uploadTimeInDay).sort() : [];
 
+      const publishAt = estimatePublishTime(pendingCount, uploadTimes, settings?.lastTriggeredDate ?? null);
       const lines: string[] = [];
-      lines.push(`📥 <b>${escapeHtml(title!)}</b>`);
-      if (group) lines.push(`📂 ${escapeHtml(group.name)}`);
-      lines.push(`📋 #${pendingCount} in queue`);
-      if (uploadTimes.length > 0) lines.push(`⏰ ${uploadTimes.join(", ")}`);
-      if (caption) lines.push(`\n💬 ${escapeHtml(caption!.length > 100 ? caption!.slice(0, 100) + "…" : caption!)}`);
+      lines.push("Queued.");
+      lines.push(`<b>${escapeHtml(title!)}</b>`);
+      if (publishAt) lines.push(`published at ${formatDateTime(publishAt)}`);
+      lines.push(`<a href="https://6gate.minfect.com/schedule">view schedule</a>`);
 
       await this.reply(botToken, message.chat.id, lines.join("\n"));
     }

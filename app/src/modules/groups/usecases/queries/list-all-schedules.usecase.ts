@@ -8,6 +8,7 @@ import {
 } from "@/infrastructure/db/schema";
 import {
   DEFAULT_UPLOAD_TIMES,
+  QUEUE_STATUS_FAILED,
   QUEUE_STATUS_PENDING,
   localDateKey,
   localTimeKey,
@@ -15,18 +16,29 @@ import {
   parseUploadTimes,
 } from "../shared/group-helpers";
 
+export interface FailedQueueItemDto {
+  id: string;
+  groupId: string;
+  groupName: string;
+  videoPath: string;
+  title: string | null;
+  errorMessage: string | null;
+  updatedAt: string;
+}
+
 export interface ScheduleOverviewItemDto {
   groupId: string;
   groupName: string;
   uploadTimesInDay: string[];
   pendingCount: number;
+  failedCount: number;
   nextUploadAt: string | null;
   lastTriggeredDate: string | null;
 }
 
 @Injectable()
 export class ListAllSchedulesUseCase {
-  async execute(): Promise<ScheduleOverviewItemDto[]> {
+  async execute(): Promise<{ schedules: ScheduleOverviewItemDto[]; failedQueueItems: FailedQueueItemDto[] }> {
     const db = getDb();
     const allGroups = await db.select().from(groups);
     const allSettings = await db.select().from(groupUploadSettings);
@@ -34,17 +46,36 @@ export class ListAllSchedulesUseCase {
       .select({ groupId: groupUploadQueue.groupId, id: groupUploadQueue.id })
       .from(groupUploadQueue)
       .where(eq(groupUploadQueue.status, QUEUE_STATUS_PENDING));
+    const failedRows = await db
+      .select()
+      .from(groupUploadQueue)
+      .where(eq(groupUploadQueue.status, QUEUE_STATUS_FAILED));
 
     const settingsMap = new Map(allSettings.map((s) => [s.groupId, s]));
     const countMap = new Map<string, number>();
     for (const row of pendingCounts) {
       countMap.set(row.groupId, (countMap.get(row.groupId) ?? 0) + 1);
     }
+    const failedMap = new Map<string, number>();
+    for (const row of failedRows) {
+      failedMap.set(row.groupId, (failedMap.get(row.groupId) ?? 0) + 1);
+    }
+
+    const groupNameMap = new Map(allGroups.map((g) => [g.id, g.name]));
+    const failedItems: FailedQueueItemDto[] = failedRows.map((row) => ({
+      id: row.id,
+      groupId: row.groupId,
+      groupName: groupNameMap.get(row.groupId) ?? row.groupId,
+      videoPath: row.videoPath,
+      title: row.title,
+      errorMessage: row.errorMessage,
+      updatedAt: row.updatedAt,
+    }));
 
     const today = localDateKey();
     const nowTime = localTimeKey();
 
-    return allGroups.map((group) => {
+    const scheduleItems = allGroups.map((group) => {
       const setting = settingsMap.get(group.id);
       const uploadTimesInDay = setting
         ? parseUploadTimes(setting.uploadTimeInDay)
@@ -82,9 +113,12 @@ export class ListAllSchedulesUseCase {
         groupName: group.name,
         uploadTimesInDay,
         pendingCount,
+        failedCount: failedMap.get(group.id) ?? 0,
         nextUploadAt,
         lastTriggeredDate: setting?.lastTriggeredDate ?? null,
       };
     });
+
+    return { schedules: scheduleItems, failedQueueItems: failedItems };
   }
 }

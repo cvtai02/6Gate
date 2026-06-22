@@ -9,6 +9,7 @@ import { getDestinationIconUrl } from "@/core/destination-icons";
 import { ProviderType } from "@/core/enums";
 import type { CreateUploadJobsDto } from "../../dtos/create-upload-jobs.dto";
 import { downloadFromUrl } from "../shared/storage-helper";
+import { isSevenRouterPath, downloadSevenRouterFile } from "@/infrastructure/providers/seven-router";
 
 type UploadJobMetadata = {
   title?: string;
@@ -20,7 +21,9 @@ type UploadJobMetadata = {
 export class CreateGroupUploadJobsUseCase {
   async execute(groupId: string, input: CreateUploadJobsDto, baseUrl: string) {
     if (!input.videoUrl) throw new Error("videoUrl is required");
-    const videoPath = await downloadFromUrl(input.videoUrl);
+    const videoPath = isSevenRouterPath(input.videoUrl)
+      ? await downloadSevenRouterFile(input.videoUrl)
+      : await downloadFromUrl(input.videoUrl);
     return this.createJobsForFile(groupId, videoPath, input, baseUrl);
   }
 

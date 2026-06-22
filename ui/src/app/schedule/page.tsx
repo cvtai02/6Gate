@@ -8,8 +8,19 @@ type ScheduleItem = {
   groupName: string;
   uploadTimesInDay: string[];
   pendingCount: number;
+  failedCount: number;
   nextUploadAt: string | null;
   lastTriggeredDate: string | null;
+};
+
+type FailedQueueItem = {
+  id: string;
+  groupId: string;
+  groupName: string;
+  videoPath: string;
+  title: string | null;
+  errorMessage: string | null;
+  updatedAt: string;
 };
 
 type HistoryJob = {
@@ -140,6 +151,7 @@ const HOUR_HEIGHT = 60;
 
 export default function SchedulePage() {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [failedQueueItems, setFailedQueueItems] = useState<FailedQueueItem[]>([]);
   const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +170,8 @@ export default function SchedulePage() {
       }),
     ])
       .then(([sched, hist]) => {
-        setSchedules(sched);
+        setSchedules(sched.schedules ?? sched);
+        setFailedQueueItems(sched.failedQueueItems ?? []);
         setHistoryBatches(hist.batches ?? []);
       })
       .catch((e) => setError(e.message))
@@ -171,9 +184,11 @@ export default function SchedulePage() {
   const weekDayKeys = new Set(weekDays.map(dateDayKey));
 
   const schedulesWithQueue = schedules.filter((s) => s.pendingCount > 0);
+  const schedulesWithFailed = schedules.filter((s) => s.failedCount > 0);
 
   const allGroupIds = new Set<string>();
   schedulesWithQueue.forEach((s) => allGroupIds.add(s.groupId));
+  schedulesWithFailed.forEach((s) => allGroupIds.add(s.groupId));
   historyBatches.forEach((b) => { if (b.groupId) allGroupIds.add(b.groupId); });
 
   const groupColors = new Map<string, (typeof GROUP_COLORS)[number]>();
@@ -190,6 +205,21 @@ export default function SchedulePage() {
   const activeHistory = selectedGroupIds
     ? historyBatches.filter((b) => b.groupId && selectedGroupIds.has(b.groupId))
     : historyBatches;
+
+  const activeFailedItems = selectedGroupIds
+    ? failedQueueItems.filter((f) => selectedGroupIds.has(f.groupId))
+    : failedQueueItems;
+
+  // Group failed queue items by day key for the current week
+  const failedByDay = new Map<string, FailedQueueItem[]>();
+  for (const item of activeFailedItems) {
+    const d = new Date(item.updatedAt);
+    const key = dateDayKey(d);
+    if (!weekDayKeys.has(key)) continue;
+    const list = failedByDay.get(key) ?? [];
+    list.push(item);
+    failedByDay.set(key, list);
+  }
 
   // Group history batches by day key for the current week
   const historyByDay = new Map<string, HistoryBatch[]>();
@@ -226,7 +256,7 @@ export default function SchedulePage() {
   }
 
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-  const hasContent = activeSchedules.length > 0 || activeHistory.length > 0;
+  const hasContent = activeSchedules.length > 0 || activeHistory.length > 0 || activeFailedItems.length > 0;
 
   return (
     <div className="p-8 space-y-6">
@@ -389,6 +419,39 @@ export default function SchedulePage() {
                             <span className="truncate">{label}</span>
                           </span>
                           <span className="text-[9px] opacity-60 ml-3 leading-none mt-0.5">{timeStr}</span>
+                        </Link>
+                      );
+                    });
+                  })()}
+
+                  {/* Failed queue items — show as red cards at their failure time */}
+                  {(() => {
+                    const dayFailed = failedByDay.get(dayStr) ?? [];
+                    const blockH = 34;
+                    const gap = 2;
+                    const stride = blockH + gap;
+                    const sorted = [...dayFailed].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+                    const anchorMins = sorted.length > 0 ? (() => { const d = new Date(sorted[0].updatedAt); return d.getHours() * 60 + d.getMinutes(); })() : 0;
+                    const anchorTop = (anchorMins / 60) * HOUR_HEIGHT;
+
+                    return sorted.map((item, idx) => {
+                      const failedAt = new Date(item.updatedAt);
+                      const label = [item.groupName, item.title].filter(Boolean).join(" - ") || "Queue item";
+                      const timeStr = failedAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+                      return (
+                        <Link
+                          key={item.id}
+                          href={`/groups/${item.groupId}/queue`}
+                          className="absolute left-1 right-1 z-10 rounded-md border px-1.5 py-0.5 flex flex-col justify-center hover:opacity-80 transition-opacity bg-red-500/15 border-red-500/40 text-red-300"
+                          style={{ top: anchorTop + idx * stride, height: blockH }}
+                          title={`${label}\nFailed: ${item.errorMessage ?? "Unknown error"}\n${timeStr}`}
+                        >
+                          <span className="flex items-center gap-1 text-[10px] leading-none truncate">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400" />
+                            <span className="truncate">{label}</span>
+                          </span>
+                          <span className="text-[9px] opacity-60 ml-3 leading-none mt-0.5">{timeStr} — failed</span>
                         </Link>
                       );
                     });

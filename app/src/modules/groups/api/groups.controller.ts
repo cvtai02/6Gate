@@ -19,6 +19,7 @@ import { EnqueueGroupUploadUseCase } from "../usecases/commands/enqueue-group-up
 import { RemoveGroupUseCase } from "../usecases/commands/remove-group.usecase";
 import { RemoveGroupDestinationUseCase } from "../usecases/commands/remove-group-destination.usecase";
 import { RemoveGroupQueueItemUseCase } from "../usecases/commands/remove-group-queue-item.usecase";
+import { RequeueGroupQueueItemUseCase } from "../usecases/commands/requeue-group-queue-item.usecase";
 import { RenameGroupUseCase } from "../usecases/commands/rename-group.usecase";
 import { UpdateGroupUploadSettingsUseCase } from "../usecases/commands/update-group-upload-settings.usecase";
 import { UpdateGroupTelegramNotifyUseCase } from "../usecases/commands/update-group-telegram-notify.usecase";
@@ -94,6 +95,7 @@ export class GroupsController {
     private readonly addGroupNotificationChannel: AddGroupNotificationChannelUseCase,
     private readonly removeGroupNotificationChannel: RemoveGroupNotificationChannelUseCase,
     private readonly listGroupNotificationChannels: ListGroupNotificationChannelsUseCase,
+    private readonly requeueGroupQueueItem: RequeueGroupQueueItemUseCase,
   ) {}
 
   @Get("schedules")
@@ -186,6 +188,15 @@ export class GroupsController {
   @HttpCode(204)
   removeQueueItem(@Param("id") id: string, @Param("itemId") itemId: string) {
     return this.removeGroupQueueItem.execute(id, itemId);
+  }
+
+  @Post(["groups/:id/queue/:itemId/retry", "combos/:id/queue/:itemId/retry"])
+  async retryQueueItem(
+    @Param("id") id: string,
+    @Param("itemId") itemId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return handleRequest(res, () => this.requeueGroupQueueItem.execute(id, itemId));
   }
 
   @Get(["groups/:id/queue-settings", "combos/:id/queue-settings"])

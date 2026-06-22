@@ -8,6 +8,7 @@ import { EnqueueGroupUploadUseCase } from "./usecases/commands/enqueue-group-upl
 import { RemoveGroupUseCase } from "./usecases/commands/remove-group.usecase";
 import { RemoveGroupDestinationUseCase } from "./usecases/commands/remove-group-destination.usecase";
 import { RemoveGroupQueueItemUseCase } from "./usecases/commands/remove-group-queue-item.usecase";
+import { RequeueGroupQueueItemUseCase } from "./usecases/commands/requeue-group-queue-item.usecase";
 import { RenameGroupUseCase } from "./usecases/commands/rename-group.usecase";
 import { UpdateGroupUploadSettingsUseCase } from "./usecases/commands/update-group-upload-settings.usecase";
 import { UpdateGroupTelegramNotifyUseCase } from "./usecases/commands/update-group-telegram-notify.usecase";
@@ -36,6 +37,7 @@ import { ListGroupsUseCase } from "./usecases/queries/list-groups.usecase";
     RemoveGroupUseCase,
     RemoveGroupDestinationUseCase,
     RemoveGroupQueueItemUseCase,
+    RequeueGroupQueueItemUseCase,
     RenameGroupUseCase,
     UpdateGroupUploadSettingsUseCase,
     UpdateGroupTelegramNotifyUseCase,

@@ -1,15 +1,32 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/infrastructure/db";
-import { accounts, groupNotificationChannels, groupUploadQueue, postJobs } from "@/infrastructure/db/schema";
+import { accounts, destinations, groupNotificationChannels, groupUploadQueue, postJobs } from "@/infrastructure/db/schema";
 import { telegramRequest } from "@/modules/accounts/usecases/shared/telegram-helpers";
 import { decryptValue } from "@/core/security/crypto";
 import { env } from "@/infrastructure/config/env";
-import { PublishStatus } from "@/core/enums";
+import { DestinationMeta, PublishStatus } from "@/core/enums";
+import type { DestinationType } from "@/core/enums";
 
 export async function notifyTelegramIfConfigured(uploadBatchId: string) {
   const db = getDb();
 
-  const batchJobs = await db.select().from(postJobs).where(eq(postJobs.uploadBatchId, uploadBatchId));
+  const batchJobs = await db
+    .select({
+      id: postJobs.id,
+      status: postJobs.status,
+      platform: postJobs.platform,
+      groupId: postJobs.groupId,
+      title: postJobs.title,
+      providerPostUrl: postJobs.providerPostUrl,
+      errorMessage: postJobs.errorMessage,
+      destinationId: postJobs.destinationId,
+      destinationName: destinations.name,
+      destinationType: destinations.type,
+      destinationExternalId: destinations.externalId,
+    })
+    .from(postJobs)
+    .leftJoin(destinations, eq(postJobs.destinationId, destinations.id))
+    .where(eq(postJobs.uploadBatchId, uploadBatchId));
   if (batchJobs.length === 0) return;
 
   const allDone = batchJobs.every(
@@ -38,14 +55,21 @@ export async function notifyTelegramIfConfigured(uploadBatchId: string) {
   }
 
   for (const job of published) {
+    const label = formatDestLabel(job.destinationType);
     const url = job.providerPostUrl;
-    const platform = job.platform ?? "unknown";
-    lines.push(url ? `  • ${platform}: <a href="${escapeHtml(url)}">link</a>` : `  • ${platform}: published`);
+    if (url) {
+      lines.push(`  • ${label}: <a href="${escapeHtml(url)}">link</a>`);
+    } else {
+      const profileUrl = buildProfileUrl(job.destinationType, job.destinationExternalId);
+      lines.push(profileUrl
+        ? `  • ${label}: <a href="${escapeHtml(profileUrl)}">profile</a>`
+        : `  • ${label}: published`);
+    }
   }
   for (const job of failed) {
-    const platform = job.platform ?? "unknown";
+    const label = formatDestLabel(job.destinationType);
     const err = job.errorMessage ? `: ${escapeHtml(job.errorMessage.slice(0, 100))}` : "";
-    lines.push(`  • ${platform}: failed${err}`);
+    lines.push(`  • ${label}: failed${err}`);
   }
 
   const text = lines.join("\n");
@@ -86,6 +110,23 @@ export async function notifyTelegramIfConfigured(uploadBatchId: string) {
         disable_web_page_preview: true,
       });
     } catch {}
+  }
+}
+
+function formatDestLabel(type: string | null): string {
+  const meta = type ? DestinationMeta[type as DestinationType] : null;
+  return escapeHtml(meta?.displayName ?? "unknown");
+}
+
+function buildProfileUrl(type: string | null, externalId: string | null): string | null {
+  if (!externalId) return null;
+  switch (type) {
+    case "youtube_channel": return `https://www.youtube.com/channel/${externalId}`;
+    case "facebook_page": return `https://www.facebook.com/${externalId}`;
+    case "tiktok_account": return `https://www.tiktok.com/@${externalId}`;
+    case "instagram_account": return `https://www.instagram.com/${externalId}`;
+    case "threads_profile": return `https://www.threads.net/@${externalId}`;
+    default: return null;
   }
 }
 
